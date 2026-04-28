@@ -22,7 +22,9 @@ _NODE_NAME = "ComfyUI-AIMDO-XPU"
 # --------------------------------------------------------------------------
 try:
     import comfy_aimdo
+    _version = getattr(comfy_aimdo, "__version__", "unknown")
     _aimdo_file = getattr(comfy_aimdo, "__file_location__", None) or getattr(comfy_aimdo, "__file__", "unknown")
+    print(f"[{_NODE_NAME}] version { _version}", flush=True)
 
     if _aimdo_file and "ComfyUI-AIMDO-XPU" in _aimdo_file:
         print(f"[{_NODE_NAME}] ✅ XPU hijack ACTIVE  →  {_aimdo_file}", flush=True)
