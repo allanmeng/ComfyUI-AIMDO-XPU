@@ -1,0 +1,4 @@
+# working memory & caches
+.workbuddy/
+__pycache__/
+*.pyc
