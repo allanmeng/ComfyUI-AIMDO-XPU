@@ -9,7 +9,7 @@ from . import torch as torch_aimdo
 from . import host_buffer
 from . import model_mmap
 
-__version__ = "0.1.0-xpu"
+__version__ = "0.1"
 __file_location__ = __file__
 
 # ------------------------------------------------------------------
