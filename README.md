@@ -2,6 +2,8 @@
 
 Intel XPU 版动态模型卸载器（comfy-aimdo XPU 替代实现）
 
+[**English**](README_EN.md) | 中文
+
 ---
 
 ## 原版 comfy-aimdo（CUDA）核心能力
@@ -82,8 +84,6 @@ ComfyUI-AIMDO-XPU/
 | **⑯ 上游反馈** | 向 ComfyUI 官方提 PR 建议 | ⬜ 待做 | 将 XPU 兼容代码合并入官方，减少下游补丁依赖 |
 
 ---
-
-## 激活方式
 
 ## 激活方式
 
