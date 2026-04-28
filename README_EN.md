@@ -86,6 +86,39 @@ ComfyUI-AIMDO-XPU/
 
 ---
 
+## Download & Installation
+
+### Method 1: Git Clone (Recommended)
+
+```batch
+cd f:\ComfyUI-aki-v3\ComfyUI\custom_nodes
+git clone https://github.com/allanmeng/ComfyUI-AIMDO-XPU.git
+```
+
+### Method 2: Download ZIP
+
+1. Visit the [GitHub repository](https://github.com/allanmeng/ComfyUI-AIMDO-XPU)
+2. Click **Code** → **Download ZIP**
+3. Extract to `ComfyUI/custom_nodes/ComfyUI-AIMDO-XPU` directory
+
+### Prerequisites
+
+- Intel Arc B-Series GPU (B580 / B570 etc.)
+- Intel oneAPI Base Toolkit (provides oneMKL and SYCL runtime)
+- PyTorch XPU version: `pip install torch --index-url https://download.pytorch.org/whl/xpu`
+- ComfyUI-aki-v3 or other ComfyUI distribution with Intel XPU support
+
+### Verify Installation
+
+After launching ComfyUI, check if the logs show:
+
+```
+[ComfyUI-AIMDO-XPU] ✅ XPU hijack ACTIVE
+[ComfyUI-AIMDO-XPU] v0.1
+```
+
+---
+
 ## Activation
 
 Add this project's root to `PYTHONPATH` **before** launching ComfyUI:
