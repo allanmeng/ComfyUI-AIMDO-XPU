@@ -51,6 +51,78 @@ def _xpu_total_memory(device_id: int = 0) -> int:
 
 
 # --------------------------------------------------------------------------
+# API compat check – verify all public interfaces exist
+# --------------------------------------------------------------------------
+
+_api_check_ran = False
+
+def _check_api_compat():
+    """
+    Scan the full comfy_aimdo package and print a per-function compat report.
+    Runs once at first init(); subsequent calls are no-ops.
+    """
+    global _api_check_ran
+    if _api_check_ran:
+        return
+    _api_check_ran = True
+
+    import comfy_aimdo as _pkg
+
+    # (display_name, checker) pairs
+    _checks = [
+        # ── control module ──
+        ("control.init",                       lambda: callable(_pkg.control.init)),
+        ("control.init_device",                lambda: callable(_pkg.control.init_device)),
+        ("control.deinit",                     lambda: callable(_pkg.control.deinit)),
+        ("control.get_total_vram_usage",       lambda: callable(_pkg.control.get_total_vram_usage)),
+        ("control.analyze",                    lambda: callable(_pkg.control.analyze)),
+        ("control.lib",                        lambda: hasattr(_pkg.control, "lib")),
+        ("control.set_log_* (×8)",             lambda: all(
+            hasattr(_pkg.control, f"set_log_{lvl}")
+            for lvl in ["none", "critical", "error", "warning", "info", "debug", "verbose", "vverbose"]
+        )),
+        # ── model_vbar module ──
+        ("model_vbar.ModelVBAR",               lambda: callable(_pkg.model_vbar.ModelVBAR)),
+        ("model_vbar.vbar_fault",              lambda: callable(_pkg.model_vbar.vbar_fault)),
+        ("model_vbar.vbar_unpin",              lambda: callable(_pkg.model_vbar.vbar_unpin)),
+        ("model_vbar.vbar_signature_compare",  lambda: callable(_pkg.model_vbar.vbar_signature_compare)),
+        ("model_vbar.vbars_reset_watermark_limits", lambda: callable(_pkg.model_vbar.vbars_reset_watermark_limits)),
+        ("model_vbar.vbars_analyze",           lambda: callable(_pkg.model_vbar.vbars_analyze)),
+        # ── torch_aimdo module (imported as "torch" alias in comfy_aimdo/__init__.py) ──
+        ("torch.aimdo_to_tensor",              lambda: callable(_pkg.torch_aimdo.aimdo_to_tensor)),
+        ("torch.hostbuf_to_tensor",            lambda: callable(_pkg.torch_aimdo.hostbuf_to_tensor)),
+        ("torch.get_tensor_from_raw_ptr",      lambda: callable(_pkg.torch_aimdo.get_tensor_from_raw_ptr)),
+        ("torch.get_torch_allocator",          lambda: callable(_pkg.torch_aimdo.get_torch_allocator)),
+        ("torch.CUDAPluggableAllocator",       lambda: callable(_pkg.torch_aimdo.CUDAPluggableAllocator)),
+        # ── host_buffer module ──
+        ("host_buffer.HostBuffer",             lambda: callable(_pkg.host_buffer.HostBuffer)),
+        # ── model_mmap module ──
+        ("model_mmap.ModelMMAP",               lambda: callable(_pkg.model_mmap.ModelMMAP)),
+    ]
+
+    total = len(_checks)
+    failed = []
+
+    for name, check in _checks:
+        try:
+            if not check():
+                failed.append(name)
+        except Exception:
+            failed.append(name)
+
+    passed = total - len(failed)
+
+    # ── Print report ──
+    print(f"[ComfyUI-AIMDO-XPU] API compat check ─────────────────", flush=True)
+    for name, _ in _checks:
+        icon = "✅" if name not in failed else "❌"
+        print(f"  {icon}  {name}", flush=True)
+    if failed:
+        print(f"  ❌  MISSING: {', '.join(failed)}", flush=True)
+    print(f"───────────────────────────────── {passed}/{total} aligned {'✅' if passed == total else '⚠️'}", flush=True)
+
+
+# --------------------------------------------------------------------------
 # Public API  (must match comfy-aimdo 0.2.x exactly)
 # --------------------------------------------------------------------------
 
@@ -68,6 +140,10 @@ def init() -> bool:
         return False
 
     _initialised = True
+
+    # Run API compat check once at startup
+    _check_api_compat()
+
     print(
         f"[ComfyUI-AIMDO-XPU] control.init() OK  "
         f"(torch.xpu device count={torch.xpu.device_count()})",
