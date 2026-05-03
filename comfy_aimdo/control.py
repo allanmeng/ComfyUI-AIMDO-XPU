@@ -98,6 +98,8 @@ def _check_api_compat():
         ("host_buffer.HostBuffer",             lambda: callable(_pkg.host_buffer.HostBuffer)),
         # ── model_mmap module ──
         ("model_mmap.ModelMMAP",               lambda: callable(_pkg.model_mmap.ModelMMAP)),
+        # ── vram_buffer module ──
+        ("vram_buffer.VRAMBuffer",             lambda: callable(_pkg.vram_buffer.VRAMBuffer)),
     ]
 
     total = len(_checks)

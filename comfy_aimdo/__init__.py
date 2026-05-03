@@ -8,8 +8,9 @@ from . import model_vbar
 from . import torch as torch_aimdo
 from . import host_buffer
 from . import model_mmap
+from . import vram_buffer
 
-__version__ = "0.1"
+__version__ = "0.2"
 __file_location__ = __file__
 
 # ------------------------------------------------------------------

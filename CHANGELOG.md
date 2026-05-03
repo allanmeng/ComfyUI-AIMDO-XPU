@@ -1,5 +1,18 @@
 # 更新日志
 
+## v0.2 (2026-05-04)
+
+### 新增
+- `vram_buffer.py`：新增 `VRAMBuffer` 类，兼容 ComfyUI 新版 `comfy_aimdo.vram_buffer` 接口
+- `control.py`：启动时打印 API 兼容性检查（`_check_api_compat()`），20 项接口覆盖
+- 版本号提升至 v0.2
+
+### 修复
+- API 兼容性检查中使用 `torch_aimdo` 别名正确引用子模块
+
+### 其他
+- 小深（Deepseek V4）接手维护
+
 ## v0.1 (2026-04-28)
 
 ### 首次发布
@@ -21,6 +34,19 @@
 ---
 
 # Changelog
+
+## v0.2 (2026-05-04)
+
+### Added
+- `vram_buffer.py`: `VRAMBuffer` class for comfy-aimdo upstream API compatibility
+- `control.py`: API compat check on startup (`_check_api_compat()`), covering 20 interfaces
+- Version bumped to v0.2
+
+### Fixed
+- `torch_aimdo` alias properly used in API compat check
+
+### Misc
+- 小深 (Deepseek V4) takes over maintenance
 
 ## v0.1 (2026-04-28)
 
