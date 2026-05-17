@@ -1,5 +1,16 @@
 # 更新日志
 
+## v0.3 (2026-05-17)
+
+### 修复
+- **`model_mmap.py`：大模型文件零拷贝修复** — 将 `mmap.ACCESS_READ` + `from_buffer_copy()`（全量复制）
+   改为 `mmap.ACCESS_COPY` + `from_buffer()`（零拷贝），避免加载大模型时因双倍内存占用导致 OOM
+- 改进异常诊断：错误信息中加入 `[异常类型]`，方便定位根因
+- 新增文件存在性预检查，文件缺失时直接报 `FileNotFoundError`
+
+### 其他
+- 版本号提升至 v0.3
+
 ## v0.2 (2026-05-04)
 
 ### 新增
@@ -48,7 +59,25 @@
 ### Misc
 - 小深 (Deepseek V4) takes over maintenance
 
-## v0.1 (2026-04-28)
+---
+
+# Changelog
+
+## v0.3 (2026-05-17)
+
+### Fixed
+- **`model_mmap.py`: zero-copy fix for large model files** — switched from
+  `mmap.ACCESS_READ` + `from_buffer_copy()` (full file copy) to
+  `mmap.ACCESS_COPY` + `from_buffer()` (zero-copy), preventing OOM on
+  large safetensors files caused by doubled memory usage
+- Improved error diagnostics: exception type name `[TypeName]` now included
+  in error messages
+- Added file existence pre-check with explicit `FileNotFoundError`
+
+### Misc
+- Version bumped to v0.3
+
+## v0.2 (2026-05-04)
 
 ### Initial Release
 

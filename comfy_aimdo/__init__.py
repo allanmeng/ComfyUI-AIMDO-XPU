@@ -10,7 +10,7 @@ from . import host_buffer
 from . import model_mmap
 from . import vram_buffer
 
-__version__ = "0.2"
+__version__ = "0.3"
 __file_location__ = __file__
 
 # ------------------------------------------------------------------

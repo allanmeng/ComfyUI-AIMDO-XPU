@@ -11,9 +11,10 @@ CUDA original: calls aimdo.dll's model_mmap_allocate / model_mmap_get which
   virtual address space for zero-copy VBAR loading.
 
 XPU replacement: uses Python's built-in mmap module to memory-map the file
-  into the process address space.  get() returns ctypes.addressof() of the
-  mmap buffer so that the memoryview slice in comfy/utils.py:load_safetensors()
-  still works correctly (it only needs a valid CPU pointer, not a VBAR address).
+  into the process address space with ACCESS_COPY (copy-on-write) so that
+  ctypes.from_buffer() can obtain the base address without a second copy
+  of the file.  get() returns the address for the memoryview slice in
+  comfy/utils.py:load_safetensors().
 """
 
 import logging
@@ -41,17 +42,28 @@ class ModelMMAP:
         self._ptr = None
 
         try:
+            # Pre-check: fail fast with a clear message if the file doesn't exist
+            if not os.path.isfile(normalized):
+                raise FileNotFoundError(f"file not found: '{normalized}'")
+
             self._file = open(normalized, "rb")
+            file_size = os.path.getsize(normalized)
+
+            # Use ACCESS_COPY (copy-on-write) so the mmap is writable.
+            # This lets ctypes.from_buffer() obtain the address without
+            # making a full copy of the file — fixing an OOM / MemoryError
+            # that from_buffer_copy() causes on large models (several GiB).
             self._mm = mmap.mmap(
                 self._file.fileno(),
                 0,                          # map entire file
-                access=mmap.ACCESS_READ,
+                access=mmap.ACCESS_COPY,
             )
-            # Expose as a ctypes array so we can get its address.
-            # from_buffer_copy always creates a writable copy, even though
-            # the source mmap is read-only (checkpoint files must not be modified).
-            file_size = os.path.getsize(normalized)
-            self._cbuf = (ctypes.c_uint8 * file_size).from_buffer_copy(self._mm)
+
+            # Zero-copy: expose the mmap as a ctypes array at its original
+            # address.  Because the mmap is writable (ACCESS_COPY),
+            # from_buffer() works where ACCESS_READ would throw
+            # "TypeError: underlying buffer is not writable".
+            self._cbuf = (ctypes.c_uint8 * file_size).from_buffer(self._mm)
             self._ptr = ctypes.addressof(self._cbuf)
             logger.debug(
                 f"[ComfyUI-AIMDO-XPU] ModelMMAP mapped '{normalized}' "
@@ -59,7 +71,10 @@ class ModelMMAP:
             )
         except Exception as e:
             self._cleanup()
-            raise RuntimeError(f"[ComfyUI-AIMDO-XPU] ModelMMAP failed for '{normalized}': {e}")
+            raise RuntimeError(
+                f"[ComfyUI-AIMDO-XPU] ModelMMAP failed for '{normalized}': "
+                f"[{type(e).__name__}] {e}"
+            )
 
     def get(self) -> int:
         """Returns the raw memory address of the mapped data."""
