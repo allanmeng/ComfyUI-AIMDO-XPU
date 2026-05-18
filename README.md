@@ -120,11 +120,14 @@ git clone https://github.com/allanmeng/ComfyUI-AIMDO-XPU.git
 
 ## 激活方式
 
-在启动 ComfyUI **之前**，将本项目根目录加到 `PYTHONPATH` 最前面：
+在启动 ComfyUI **之前**，将本项目根目录赋值到 `PYTHONPATH` ，放到bat启动文件中， main.py的前面：
 
 ```batch
 :: 假设你的启动脚本位于 ComfyUI-aki-v3\ 目录下
 set "PYTHONPATH=%~dp0ComfyUI\custom_nodes\ComfyUI-AIMDO-XPU;%PYTHONPATH%"
+
+:: 下面这句是原来的启动项
+"%PYTHON_PATH%\python.exe" "%COMFYUI_PATH%\main.py" --lowvram --disable-smart-memory --reserve-vram 0.1 --preview-method none --use-pytorch-cross-attention
 ```
 
 `%~dp0` 自动指向 bat 文件所在目录，适配任意安装路径。
