@@ -73,6 +73,7 @@ def _check_api_compat():
         # ── control module ──
         ("control.init",                       lambda: callable(_pkg.control.init)),
         ("control.init_device",                lambda: callable(_pkg.control.init_device)),
+        ("control.init_devices",               lambda: callable(_pkg.control.init_devices)),
         ("control.deinit",                     lambda: callable(_pkg.control.deinit)),
         ("control.get_total_vram_usage",       lambda: callable(_pkg.control.get_total_vram_usage)),
         ("control.analyze",                    lambda: callable(_pkg.control.analyze)),
@@ -151,6 +152,17 @@ def init() -> bool:
         f"(torch.xpu device count={torch.xpu.device_count()})",
         flush=True,
     )
+    return True
+
+
+def init_devices(device_ids):
+    """
+    Called by main.py (new in ComfyUI) to initialise all XPU devices at once.
+    Replaces the single-device init_device() call in newer versions.
+    """
+    for device_id in device_ids:
+        if not init_device(device_id):
+            return False
     return True
 
 
