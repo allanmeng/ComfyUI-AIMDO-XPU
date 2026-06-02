@@ -46,8 +46,14 @@ except Exception as e:
 
 class XPUAIMDOStatus:
     """
-    A simple utility node that reports the current AIMDO backend status.
-    Add it to any workflow to confirm XPU AIMDO is active.
+    报告 XPU AIMDO 后端状态，并提供 DynamicVRAM 运行时开关。
+
+    【使用说明】
+    - 将此节点放入工作流任意位置
+    - 开启 DynamicVRAM：勾选复选框（ON），模型将通过 VBAR 动态管理显存
+    - 关闭 DynamicVRAM：取消勾选（OFF），模型全量加载，速度更快
+    - 工作流中无此节点时，默认关闭 DynamicVRAM（全速模式）
+    - 切换工作流时自动复位，无需手动操作
     """
 
     CATEGORY = "utils/XPU"
@@ -58,11 +64,34 @@ class XPUAIMDOStatus:
 
     @classmethod
     def INPUT_TYPES(cls):
-        return {"required": {}}
+        return {
+            "required": {
+                "Enable_DynamicVRAM": ("BOOLEAN", {"default": False, "label_on": "ON", "label_off": "OFF"}),
+                "debug": ("BOOLEAN", {"default": False, "label_on": "DEBUG ON", "label_off": "DEBUG OFF"}),
+            },
+            "optional": {
+                "usage": ("STRING", {
+                    "multiline": True,
+                    "default": (
+                        "━━━ 使用说明 ━━━\n"
+                        "☐ OFF = 全速模式（默认）\n"
+                        "☑ ON  = DynamicVRAM 显存管理\n"
+                        "无此节点 = 默认 OFF\n"
+                        "━━━━━━━━━━━━━━━"
+                    ),
+                }),
+            }
+        }
 
-    def report(self):
+    def report(self, Enable_DynamicVRAM, debug=False, usage=None):
         import comfy_aimdo
+        from comfy_aimdo import control as coctrl
         import torch
+
+        # Apply the user's toggle, debug flag, and mark Status node as active
+        coctrl.set_dynamic_vram(Enable_DynamicVRAM)
+        coctrl._debug = debug
+        coctrl._status_node_active = True
 
         aimdo_file = getattr(comfy_aimdo, "__file_location__", None) or getattr(comfy_aimdo, "__file__", "unknown")
         xpu_ok = hasattr(torch, "xpu") and torch.xpu.is_available()
@@ -71,6 +100,7 @@ class XPUAIMDOStatus:
             f"comfy_aimdo location : {aimdo_file}",
             f"XPU hijack active    : {'YES' if 'ComfyUI-AIMDO-XPU' in str(aimdo_file) else 'NO'}",
             f"torch.xpu available  : {'YES' if xpu_ok else 'NO'}",
+            f"DynamicVRAM          : {'ON ✅' if coctrl.is_dynamic_vram_enabled() else 'OFF ❌'}",
         ]
 
         if xpu_ok:
@@ -90,7 +120,9 @@ class XPUAIMDOStatus:
 
         status = "\n".join(lines)
         print(f"[{_NODE_NAME}]\n{status}", flush=True)
-        return (status,)
+        # Return unique UI payload to prevent ComfyUI from caching this node
+        import time
+        return {"ui": {"t": [time.time()]}, "result": (status,)}
 
 
 # --------------------------------------------------------------------------

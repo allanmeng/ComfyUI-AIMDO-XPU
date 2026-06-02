@@ -28,6 +28,14 @@ _initialised = False
 _device_id: int = -1
 _log_level = logging.INFO
 
+# DynamicVRAM runtime state
+_dynamic_vram_enabled = False
+# True when Status node ran in the current prompt.
+# Per-prompt reset reads this to detect node deletion.
+_status_node_active = False
+# Debug flag – toggled by the "debug" checkbox on the Status node.
+_debug = False
+
 logger = logging.getLogger("comfy_aimdo_xpu")
 
 
@@ -77,6 +85,8 @@ def _check_api_compat():
         ("control.deinit",                     lambda: callable(_pkg.control.deinit)),
         ("control.get_total_vram_usage",       lambda: callable(_pkg.control.get_total_vram_usage)),
         ("control.analyze",                    lambda: callable(_pkg.control.analyze)),
+        ("control.set_dynamic_vram",           lambda: callable(_pkg.control.set_dynamic_vram)),
+        ("control.is_dynamic_vram_enabled",    lambda: callable(_pkg.control.is_dynamic_vram_enabled)),
         ("control.lib",                        lambda: hasattr(_pkg.control, "lib")),
         ("control.set_log_* (×8)",             lambda: all(
             hasattr(_pkg.control, f"set_log_{lvl}")
@@ -97,8 +107,10 @@ def _check_api_compat():
         ("torch.CUDAPluggableAllocator",       lambda: callable(_pkg.torch_aimdo.CUDAPluggableAllocator)),
         # ── host_buffer module ──
         ("host_buffer.HostBuffer",             lambda: callable(_pkg.host_buffer.HostBuffer)),
+        ("host_buffer.read_file_to_device",    lambda: callable(_pkg.host_buffer.read_file_to_device)),
         # ── model_mmap module ──
         ("model_mmap.ModelMMAP",               lambda: callable(_pkg.model_mmap.ModelMMAP)),
+        ("model_mmap.ModelMMAP.get_file_handle", lambda: callable(_pkg.model_mmap.ModelMMAP.get_file_handle)),
         # ── vram_buffer module ──
         ("vram_buffer.VRAMBuffer",             lambda: callable(_pkg.vram_buffer.VRAMBuffer)),
     ]
@@ -159,11 +171,75 @@ def init_devices(device_ids):
     """
     Called by main.py (new in ComfyUI) to initialise all XPU devices at once.
     Replaces the single-device init_device() call in newer versions.
+
+    Returns True only when DynamicVRAM is enabled.  When False (the default
+    on startup), main.py will NOT set CoreModelPatcher = ModelPatcherDynamic,
+    keeping models in fast full-load mode.
     """
     for device_id in device_ids:
-        if not init_device(device_id):
+        try:
+            init_device(device_id)
+        except Exception:
             return False
-    return True
+
+    # Return True only if DynamicVRAM is actively enabled.
+    # When False, main.py skips the CoreModelPatcher swap.
+    return _dynamic_vram_enabled
+
+
+def is_dynamic_vram_enabled() -> bool:
+    """Return whether DynamicVRAM is currently active."""
+    return _dynamic_vram_enabled
+
+
+def set_dynamic_vram(enable: bool):
+    """
+    Runtime toggle for DynamicVRAM.
+    
+    Force-unloads all models and patches the `is_dynamic` method on
+    every ModelPatcher instance in memory (including those cached in
+    ComfyUI's node output cache), so the next prompt's model loading
+    uses the correct patcher behavior.
+    """
+    global _dynamic_vram_enabled
+    if enable == _dynamic_vram_enabled:
+        return
+
+    import comfy.memory_management
+    import comfy.model_patcher as _mp
+    import gc
+
+    _dynamic_vram_enabled = enable
+
+    # 1) Force-unload all cached models from VRAM
+    try:
+        from comfy.model_management import current_loaded_models
+        for lm in list(current_loaded_models):
+            try:
+                lm.model_unload()
+            except Exception:
+                pass
+        current_loaded_models.clear()
+    except Exception:
+        pass
+
+    # 2) Patch is_dynamic() on EVERY ModelPatcher instance in memory
+    #    (including those in ComfyUI's node output cache).
+    #    This ensures the correct loading behavior on the next prompt
+    #    regardless of how the model was originally created.
+    try:
+        for obj in gc.get_objects():
+            if isinstance(obj, _mp.ModelPatcher):
+                obj.is_dynamic = lambda en=enable: en
+    except Exception:
+        pass
+
+    if enable:
+        comfy.memory_management.aimdo_enabled = True
+        print("[ComfyUI-AIMDO-XPU] ✅ DynamicVRAM enabled (via node toggle)", flush=True)
+    else:
+        comfy.memory_management.aimdo_enabled = False
+        print("[ComfyUI-AIMDO-XPU] ❌ DynamicVRAM disabled (via node toggle)", flush=True)
 
 
 def init_device(device_id: int) -> bool:

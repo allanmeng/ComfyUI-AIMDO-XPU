@@ -89,6 +89,15 @@ class ModelMMAP:
         """
         return True
 
+    def get_file_handle(self):
+        """
+        ComfyUI 0.23.0+: returns the underlying file object so that
+        TensorFileSlice can reference it for lazy tensor loading.
+        """
+        if self._file is None:
+            raise RuntimeError("ModelMMAP file handle is not available")
+        return self._file
+
     def _cleanup(self):
         self._ptr = None
         self._cbuf = None

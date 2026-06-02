@@ -191,3 +191,92 @@ try:
     print("[ComfyUI-AIMDO-XPU] torch.cuda shim active → XPU-safe CUDA stubs installed", flush=True)
 except Exception as e:
     print(f"[ComfyUI-AIMDO-XPU] Warning: torch.cuda shim failed: {e}", flush=True)
+
+# ------------------------------------------------------------------
+# Monkey-patch read_tensor_file_slice_into – ComfyUI 0.23.0 added a
+# read_file_to_device() path that assumes a cudaMemcpy-like API to
+# write file data to a raw device pointer (dest_ptr).  On XPU there
+# is no Python API for raw pointer writes, so we intercept the calling
+# function and let it fall through to the standard tensor copy.
+# ------------------------------------------------------------------
+try:
+    import comfy.memory_management
+
+    _orig_read_tensor_file_slice_into = comfy.memory_management.read_tensor_file_slice_into
+
+    def _patched_read_tensor_file_slice_into(tensor, destination, stream=None, destination2=None):
+        # When destination is None and destination2 is an XPU tensor,
+        # the code calls host_buffer.read_file_to_device() which can't
+        # write to raw XPU pointers.  Return False to fall through to
+        # the standard dest2_view.copy_(tensor) fallback.
+        if destination is None and destination2 is not None:
+            if hasattr(destination2, "device") and hasattr(destination2.device, "type"):
+                if destination2.device.type == "xpu":
+                    return False
+        return _orig_read_tensor_file_slice_into(tensor, destination, stream=stream, destination2=destination2)
+
+    comfy.memory_management.read_tensor_file_slice_into = _patched_read_tensor_file_slice_into
+    print("[ComfyUI-AIMDO-XPU] memory_management.read_tensor_file_slice_into patched → XPU safe fallback", flush=True)
+except Exception as e:
+    print(f"[ComfyUI-AIMDO-XPU] Warning: read_tensor_file_slice_into patch failed: {e}", flush=True)
+
+# ------------------------------------------------------------------
+# Per-prompt DynamicVRAM reset.
+# ------------------------------------------------------------------
+try:
+    from execution import get_output_data as _orig_get_output_data
+
+    _last_reset_prompt_id = None
+
+    async def _patched_get_output_data(prompt_id, unique_id, obj, input_data_all, execution_block_cb=None, pre_execute_cb=None, v3_data=None):
+        global _last_reset_prompt_id
+        if _last_reset_prompt_id != prompt_id:
+            _last_reset_prompt_id = prompt_id
+            from . import control as _ctrl
+            # Only reset to OFF when Status node was absent from the
+            # previous prompt (deleted/bypassed).  When present, the
+            # Status node already set the correct flag at the end of
+            # the previous prompt.  Cache clearing is done inside
+            # set_dynamic_vram() whenever the flag changes.
+            if not _ctrl._status_node_active:
+                _ctrl.set_dynamic_vram(False)
+            _ctrl._status_node_active = False  # track for THIS prompt
+        return await _orig_get_output_data(prompt_id, unique_id, obj, input_data_all, execution_block_cb=execution_block_cb, pre_execute_cb=pre_execute_cb, v3_data=v3_data)
+
+    import execution
+    execution.get_output_data = _patched_get_output_data
+    print("[ComfyUI-AIMDO-XPU] per-prompt DynamicVRAM reset active", flush=True)
+except Exception as e:
+    print(f"[ComfyUI-AIMDO-XPU] Warning: per-prompt reset patch failed: {e}", flush=True)
+
+# ------------------------------------------------------------------
+# CoreModelPatcher factory proxy.
+# Instead of setting CoreModelPatcher to a fixed class, we use a
+# factory proxy that reads _dynamic_vram_enabled at MODEL CREATION
+# TIME and selects ModelPatcher or ModelPatcherDynamic accordingly.
+# This avoids all timing/caching issues with direct class assignment.
+# ------------------------------------------------------------------
+try:
+    import comfy.model_patcher
+    import comfy.memory_management
+    from . import control as _ctrl
+
+    _BasePatcher = comfy.model_patcher.ModelPatcher
+    _DynamicPatcher = comfy.model_patcher.ModelPatcherDynamic
+
+    class _CoreModelPatcherProxy:
+        """Factory proxy – selects ModelPatcher or ModelPatcherDynamic
+        based on the current _dynamic_vram_enabled flag."""
+        def __new__(cls, model=None, load_device=None, offload_device=None, size=0, weight_inplace_update=False):
+            enabled = _ctrl._dynamic_vram_enabled
+            if _ctrl._debug:
+                print(f"[ComfyUI-AIMDO-XPU] [Proxy] {'DynamicPatcher' if enabled else 'BasePatcher'} for {model.__class__.__name__ if model else '?'} (_dynamic_vram_enabled={enabled})", flush=True)
+            if enabled:
+                return _DynamicPatcher(model, load_device, offload_device, size, weight_inplace_update)
+            return _BasePatcher(model, load_device, offload_device, size, weight_inplace_update)
+
+    comfy.model_patcher.CoreModelPatcher = _CoreModelPatcherProxy
+    comfy.memory_management.aimdo_enabled = False
+    print("[ComfyUI-AIMDO-XPU] DynamicVRAM default: OFF (proxy-based, no timing issues)", flush=True)
+except Exception as e:
+    print(f"[ComfyUI-AIMDO-XPU] Warning: CoreModelPatcher proxy failed: {e}", flush=True)
