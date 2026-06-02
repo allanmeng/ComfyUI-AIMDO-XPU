@@ -10,7 +10,7 @@ from . import host_buffer
 from . import model_mmap
 from . import vram_buffer
 
-__version__ = "0.4"
+__version__ = "0.5"
 __file_location__ = __file__
 
 # ------------------------------------------------------------------
@@ -233,14 +233,9 @@ try:
         if _last_reset_prompt_id != prompt_id:
             _last_reset_prompt_id = prompt_id
             from . import control as _ctrl
-            # Only reset to OFF when Status node was absent from the
-            # previous prompt (deleted/bypassed).  When present, the
-            # Status node already set the correct flag at the end of
-            # the previous prompt.  Cache clearing is done inside
-            # set_dynamic_vram() whenever the flag changes.
-            if not _ctrl._status_node_active:
-                _ctrl.set_dynamic_vram(False)
-            _ctrl._status_node_active = False  # track for THIS prompt
+            # Always start each prompt in OFF mode.
+            # Status node (if present) re-enables ON at the end.
+            _ctrl.set_dynamic_vram(False)
         return await _orig_get_output_data(prompt_id, unique_id, obj, input_data_all, execution_block_cb=execution_block_cb, pre_execute_cb=pre_execute_cb, v3_data=v3_data)
 
     import execution
@@ -250,11 +245,43 @@ except Exception as e:
     print(f"[ComfyUI-AIMDO-XPU] Warning: per-prompt reset patch failed: {e}", flush=True)
 
 # ------------------------------------------------------------------
-# CoreModelPatcher factory proxy.
-# Instead of setting CoreModelPatcher to a fixed class, we use a
-# factory proxy that reads _dynamic_vram_enabled at MODEL CREATION
-# TIME and selects ModelPatcher or ModelPatcherDynamic accordingly.
-# This avoids all timing/caching issues with direct class assignment.
+# Patch cache retrieval – ensure cached ModelPatcher instances have
+# the correct is_dynamic() matching the current flag.
+# ------------------------------------------------------------------
+try:
+    from comfy_execution.caching import BasicCache as _BasicCache
+    _orig_get_immediate = _BasicCache._get_immediate
+
+    async def _patched_get_immediate(self, node_id):
+        value = await _orig_get_immediate(self, node_id)
+        if value is not None:
+            from . import control as _ctrl
+            import comfy.model_patcher as _mp
+            def _patch_mp(mp):
+                mp.is_dynamic = lambda en=_ctrl._dynamic_vram_enabled: en
+            if isinstance(value, _mp.ModelPatcher):
+                _patch_mp(value)
+            elif isinstance(value, (list, tuple)):
+                for item in value:
+                    if isinstance(item, _mp.ModelPatcher):
+                        _patch_mp(item)
+                    elif isinstance(item, (list, tuple)):
+                        for sub in item:
+                            if isinstance(sub, _mp.ModelPatcher):
+                                _patch_mp(sub)
+        return value
+
+    _BasicCache._get_immediate = _patched_get_immediate
+    print("[ComfyUI-AIMDO-XPU] cache-retrieval is_dynamic patch active", flush=True)
+except Exception as e:
+    print(f"[ComfyUI-AIMDO-XPU] Warning: cache-retrieval patch failed: {e}", flush=True)
+
+# ------------------------------------------------------------------
+# CoreModelPatcher factory proxy (first-chance).
+# Wraps CoreModelPatcher so that NEWLY created models (first load or
+# after cache-clear) get the correct patcher type at creation time.
+# CACHED models are handled by set_dynamic_vram()'s gc-level patch
+# of is_dynamic() on all existing ModelPatcher instances.
 # ------------------------------------------------------------------
 try:
     import comfy.model_patcher

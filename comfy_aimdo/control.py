@@ -194,12 +194,13 @@ def is_dynamic_vram_enabled() -> bool:
 
 def set_dynamic_vram(enable: bool):
     """
-    Runtime toggle for DynamicVRAM.
-    
-    Force-unloads all models and patches the `is_dynamic` method on
-    every ModelPatcher instance in memory (including those cached in
-    ComfyUI's node output cache), so the next prompt's model loading
-    uses the correct patcher behavior.
+    Runtime toggle for DynamicVRAM using __class__ swapping.
+
+    ON  → __class__ = ModelPatcherDynamic，补齐属性，调 register_load_device
+    OFF → __class__ = ModelPatcher + 四步清洗：
+           ① 清 VBAR 注册表 + allocs（释放 16GB 虚拟空间）
+           ② 清 dynamic_vbars/pins + empty_cache（恢复显存连续性）
+           ③ 清 current_loaded_models（迫使下次全量重载）
     """
     global _dynamic_vram_enabled
     if enable == _dynamic_vram_enabled:
@@ -211,46 +212,70 @@ def set_dynamic_vram(enable: bool):
 
     _dynamic_vram_enabled = enable
 
-    # 1) Force-unload all cached models from VRAM
     try:
         from comfy.model_management import current_loaded_models
-        for lm in list(current_loaded_models):
+
+        for obj in gc.get_objects():
+            if not isinstance(obj, _mp.ModelPatcher):
+                continue
+            if enable:
+                # ── OFF → ON ──
+                obj.__class__ = _mp.ModelPatcherDynamic
+                bm = getattr(obj, "model", None)
+                if bm is not None:
+                    if not hasattr(bm, "dynamic_pins"):
+                        bm.dynamic_pins = {}
+                    if not hasattr(bm, "dynamic_vbars"):
+                        bm.dynamic_vbars = {}
+                obj.non_dynamic_delegate_model = None
+                try:
+                    obj.register_load_device(obj.load_device)
+                except Exception:
+                    pass
+            else:
+                # ── ON → OFF ── ① MRO 切回 Base
+                obj.__class__ = _mp.ModelPatcher
+                try:
+                    del obj.non_dynamic_delegate_model
+                except AttributeError:
+                    pass
+
+        if not enable:
+            # ② 清 VBAR 注册表 + allocs
             try:
-                lm.model_unload()
+                from . import model_vbar as _mv
+                for vbar in list(_mv._registry):
+                    try:
+                        vbar._allocs.clear()
+                    except Exception:
+                        pass
+                _mv._registry.clear()
             except Exception:
                 pass
+            for obj in gc.get_objects():
+                if isinstance(obj, _mp.ModelPatcher):
+                    bm = getattr(obj, "model", None)
+                    if bm is not None:
+                        try:
+                            bm.dynamic_vbars.clear()
+                        except Exception:
+                            pass
+                        try:
+                            bm.dynamic_pins.clear()
+                        except Exception:
+                            pass
+            # ③ empty_cache 释放显存碎片
+            try:
+                import torch
+                if hasattr(torch, 'xpu') and torch.xpu.is_available():
+                    torch.xpu.empty_cache()
+            except Exception:
+                pass
+
+        # ④ 清权重缓存，迫使下次全量重载
         current_loaded_models.clear()
-    except Exception:
-        pass
-
-    # 2) Patch is_dynamic() on EVERY ModelPatcher instance in memory
-    #    (including those in ComfyUI's node output cache).
-    #    This ensures the correct loading behavior on the next prompt
-    #    regardless of how the model was originally created.
-    try:
-        for obj in gc.get_objects():
-            if isinstance(obj, _mp.ModelPatcher):
-                obj.is_dynamic = lambda en=enable: en
-    except Exception:
-        pass
-
-    # 3) Clear ComfyUI's node output cache so the next prompt
-    #    re-executes model-loading nodes and creates fresh
-    #    ModelPatcher instances via the proxy.
-    try:
-        from comfy_execution.caching import BasicCache
-        for obj in gc.get_objects():
-            if isinstance(obj, BasicCache):
-                try:
-                    obj.cache.clear()
-                except Exception:
-                    pass
-                try:
-                    obj.clean_unused()
-                except Exception:
-                    pass
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[ComfyUI-AIMDO-XPU] Warning: set_dynamic_vram failed: {e}", flush=True)
 
     if enable:
         comfy.memory_management.aimdo_enabled = True

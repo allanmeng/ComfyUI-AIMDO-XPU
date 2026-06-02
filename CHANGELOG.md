@@ -1,5 +1,24 @@
 # 更新日志
 
+## v0.5 (2026-06-02)
+
+### 新增
+- **DynamicVRAM 运行时开关** — XPU AIMDO Status 节点新增 `Enable_DynamicVRAM` 开关
+  - ON：VBAR 分级加载（省显存）
+  - OFF：全速全量加载
+  - 删除节点自动恢复 OFF
+- 节点新增 `debug` 勾选框，控制 Proxy 诊断日志
+- 节点新增 `usage` 使用说明文本框
+
+### 技术改动
+- `__class__` 双向切换：运行时切换 ModelPatcher/ModelPatcherDynamic
+- 四步清洗机制：VBAR 销毁 + 显存碎片回收 + 权重缓存重载
+- 全新 `set_dynamic_vram()` 函数
+- per-prompt reset 确保每次 Prompt 从 OFF 开始
+
+### 修复
+- 适配 ComfyUI 0.23.0 节点输出缓存的时序问题
+
 ## v0.4 (2026-06-02)
 
 ### 修复
@@ -70,6 +89,25 @@
 ---
 
 # Changelog
+
+## v0.5 (2026-06-02)
+
+### Added
+- **Runtime DynamicVRAM toggle** — XPU AIMDO Status node now has an `Enable_DynamicVRAM` switch
+  - ON: VBAR staged loading (VRAM-efficient)
+  - OFF: full-speed full load
+  - Auto-reverts to OFF when node is deleted
+- `debug` checkbox on the Status node for Proxy diagnostic logs
+- `usage` text input explaining how to use the node
+
+### Changed
+- `__class__` swapping: switch between ModelPatcher/ModelPatcherDynamic at runtime
+- 4-step cleanup: VBAR destruction + VRAM defrag + weight cache reload
+- New `set_dynamic_vram()` function
+- Per-prompt reset ensures every prompt starts in OFF mode
+
+### Fixed
+- ComfyUI 0.23.0 node output cache timing issues
 
 ## v0.4 (2026-06-02)
 
