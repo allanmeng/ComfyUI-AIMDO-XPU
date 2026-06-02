@@ -2,6 +2,9 @@
 
 Intel XPU implementation of DynamicVRAM for ComfyUI (comfy-aimdo XPU replacement)
 
+> It improves VRAM utilization by adjusting how models are loaded, reducing the chance of OOM.
+> In short: OFF (full load) = "space for speed", ON (DynamicVRAM / dyvram) = "speed for space".
+
 [English](README_EN.md) | [中文](README.md)
 
 ---
@@ -134,9 +137,28 @@ set "PYTHONPATH=%~dp0ComfyUI\custom_nodes\ComfyUI-AIMDO-XPU;%PYTHONPATH%"
 > `import comfy_aimdo` will find our local `comfy_aimdo/` package first,
 > not the official CUDA version in `site-packages`.
 
-### Temporarily Disable
+### How to Disable
 
 Comment out the `set PYTHONPATH` line to switch back to official comfy-aimdo (CUDA) for comparison testing.
+
+### Toggle DynamicVRAM in the Workflow
+
+The XPU AIMDO Status node (v0.5) includes an `Enable_DynamicVRAM` switch:
+
+<img width="45%" height="45%" alt="image" src="https://github.com/user-attachments/assets/afde7138-bdf5-4d09-88a7-d31718e81e05" />
+
+- **ON** = VBAR staged loading (VRAM-efficient, slower inference)
+- **OFF** = Full-speed full load (uses more VRAM, fastest)
+- **Delete node** = auto-reverts to OFF
+- **debug** checkbox enables Proxy diagnostic logs
+
+| Mode | VRAM usage | Speed | Analogy |
+|------|-----------|-------|---------|
+| OFF (full load) | Very high (OOM risk) | Fastest (full speed) | All books spread on a huge desk — grab and read instantly |
+| ON (dyvram) | Very low (run big images on 12GB) | Slower (depends on strategy) | Small desk, only a few books fit. Need to swap books from the shelf for each new chapter |
+
+> Just place the node standalone in your workflow — no wiring needed.
+> Toggle takes effect immediately without restarting ComfyUI. Switching OFF automatically cleans up VBAR cache and VRAM fragmentation.
 
 ---
 
@@ -152,18 +174,7 @@ DynamicVRAM support detected and enabled
 
 ### Method 2: Workflow Node
 
-Add the **"XPU AIMDO Status"** node to any workflow — it displays a complete status report on execution.
-
-### Runtime DynamicVRAM Toggle
-
-The Status node (v0.5) includes an `Enable_DynamicVRAM` switch:
-
-- **ON** = VBAR staged loading (VRAM-efficient, slower inference)
-- **OFF** = Full-speed full load (uses more VRAM, fastest)
-- **Delete node** = auto-reverts to OFF
-- **debug** checkbox enables Proxy diagnostic logs
-
-> Toggle takes effect immediately without restarting ComfyUI. Switching OFF automatically cleans up VBAR cache and VRAM fragmentation.---
+Add the **"XPU AIMDO Status"** node to any workflow — the status report will appear in the startup logs.---
 
 ## Differences from Original
 
