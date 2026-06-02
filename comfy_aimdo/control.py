@@ -234,6 +234,24 @@ def set_dynamic_vram(enable: bool):
     except Exception:
         pass
 
+    # 3) Clear ComfyUI's node output cache so the next prompt
+    #    re-executes model-loading nodes and creates fresh
+    #    ModelPatcher instances via the proxy.
+    try:
+        from comfy_execution.caching import BasicCache
+        for obj in gc.get_objects():
+            if isinstance(obj, BasicCache):
+                try:
+                    obj.cache.clear()
+                except Exception:
+                    pass
+                try:
+                    obj.clean_unused()
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
     if enable:
         comfy.memory_management.aimdo_enabled = True
         print("[ComfyUI-AIMDO-XPU] ✅ DynamicVRAM enabled (via node toggle)", flush=True)
