@@ -1,8 +1,10 @@
-# ComfyUI-AIMDO-XPU
+# Intel XPU 版动态模型卸载器（comfy-aimdo XPU 替代实现）
 
-Intel XPU 版动态模型卸载器（comfy-aimdo XPU 替代实现）
+> 本质是通过调整模型的加载方式，提高显存利用率，降低OOM发生的几率
+> 简单来说：OFF（全量加载）是“空间换时间”，而 ON（DynamicVRAM / dyvram）是“时间换空间”。
 
 [**English**](README_EN.md) | 中文
+
 
 ---
 
@@ -138,9 +140,31 @@ set "PYTHONPATH=%~dp0ComfyUI\custom_nodes\ComfyUI-AIMDO-XPU;%PYTHONPATH%"
 > `import comfy_aimdo` 会优先找到本目录下的 `comfy_aimdo/` 包，
 > 而不是 `site-packages` 中的官方 CUDA 版本。
 
-### 临时禁用劫持
+### 如何禁用劫持
 
 注释掉上述 `set PYTHONPATH` 行即可切回官方 comfy-aimdo（CUDA），用于对比测试。
+
+### 工作台中切换 DynamicVRAM
+
+XPU AIMDO Status 节点新增 `Enable_DynamicVRAM` 开关（v0.5）：
+
+<img width="45%" height="45%" alt="image" src="https://github.com/user-attachments/assets/afde7138-bdf5-4d09-88a7-d31718e81e05" />
+
+- **ON** = VBAR 显存分级加载（节省 VRAM，推理较慢）
+- **OFF** = 全速全量加载（占用更多 VRAM，推理最快）
+- **删除节点** = 自动恢复 OFF
+- **debug** 勾选框开启 Proxy 诊断日志
+
+| 模式 | 空间（显存）占用 | 运行速度 | 相当于什么？ | 
+|--------|--------|------|--------|
+|OFF（全量加载）|❌ 极高（容易 OOM 爆显存）|🚀 极快（满血全速）|所有的参考书全部平铺在巨大的书桌上，伸手就能拿到，翻书速度最快。|
+|ON（dyvram 模式）|极低（12G 也能跑巨型大图）|🐢 变慢（取决于策略）|书桌很小，放不下几本书。每次要看下一章，都得把桌上的书收起来，再从书架上拿一本新书摆出来。|
+
+
+
+> 只要把该节点独立的放在工作流中，保持启用状态即可，不用链接任何其他节点
+> 切换Enable_DynamicVRAM开关，立即生效，无需重启 ComfyUI。切换 OFF 后会自动清理 VBAR 缓存和显存碎片。
+
 
 ---
 
@@ -156,18 +180,7 @@ DynamicVRAM support detected and enabled
 
 ### 方法二：工作流节点
 
-在工作流中添加 **"XPU AIMDO Status"** 节点，运行后会显示完整状态报告。
-
-### 运行时切换 DynamicVRAM
-
-XPU AIMDO Status 节点新增 `Enable_DynamicVRAM` 开关（v0.5）：
-
-- **ON** = VBAR 显存分级加载（节省 VRAM，推理较慢）
-- **OFF** = 全速全量加载（占用更多 VRAM，推理最快）
-- **删除节点** = 自动恢复 OFF
-- **debug** 勾选框开启 Proxy 诊断日志
-
-> 切换立即生效，无需重启 ComfyUI。切换 OFF 后会自动清理 VBAR 缓存和显存碎片。
+在工作流中添加 **"XPU AIMDO Status"** 节点，运行后日志中会显示完整状态报告。
 
 ---
 
