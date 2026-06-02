@@ -56,7 +56,8 @@ ComfyUI-AIMDO-XPU/
 │   ├── torch.py              ← aimdo_to_tensor / hostbuf_to_tensor
 │   ├── host_buffer.py       ← HostBuffer（用 torch pin_memory 代替 CUDA）
 │   └── model_mmap.py         ← ModelMMAP（用 Python mmap 代替 aimdo.dll）
-├── __init__.py               ← custom_node 入口；含启动验证 + XPUAIMDOStatus 节点
+│   ├── vram_buffer.py       ← VRAMBuffer（ComfyUI 新版接口）
+├── __init__.py               ← custom_node 入口；含 XPUAIMDOStatus 节点（开关 + debug）
 └── README.md
 ```
 
@@ -76,12 +77,13 @@ ComfyUI-AIMDO-XPU/
 | **⑧ 第三方兼容** | SeedVR2 插件兼容 | ✅ 已完成 | `torch.cuda.device('cuda:N')` 映射到 `xpu:N` |
 | **⑨ 功能验证** | SDXL 推理跑通 | ✅ 已完成 | DynamicVRAM 开启，82s 执行，无 OOM |
 | **⑩ 第三方兼容** | 其他插件 CUDA 硬编码清理 | 🔄 进行中 | 按需发现、按需修复 |
-| **⑪ 稳定性验证** | 长时间/大批量推理测试 | ⬜ 待做 | 验证无内存泄漏、无资源泄露 |
-| **⑫ 功能补全** | ComfyUI 其他 DynamicVRAM 场景 | ⬜ 待做 | 如 Video models、Diffusion models larger than VRAM |
-| **⑬ 性能优化** | reserve-vram 精细化调优 | ⬜ 待做 | 针对 B580 11.67GB 做显存分段策略优化 |
-| **⑭ 性能优化** | 模型按层/模块卸载 | ⬜ 待做 | 比整体卸载更细粒度，进一步降低 OOM 风险 |
-| **⑮ 工程化** | 一键安装/配置脚本 | ⬜ 待做 | 用户无需手动改 bat，只需装插件 |
-| **⑯ 上游反馈** | 向 ComfyUI 官方提 PR 建议 | ⬜ 待做 | 将 XPU 兼容代码合并入官方，减少下游补丁依赖 |
+| **⑪ 功能补全** | DynamicVRAM 运行时开关 | ✅ v0.5 | Status 节点 ON/OFF 即时切换 |
+| **⑫ 稳定性验证** | 长时间/大批量推理测试 | ⬜ 待做 | 验证无内存泄漏、无资源泄露 |
+| **⑬ 功能补全** | ComfyUI 其他 DynamicVRAM 场景 | ⬜ 待做 | 如 Video models、Diffusion models larger than VRAM |
+| **⑭ 性能优化** | reserve-vram 精细化调优 | ⬜ 待做 | 针对 B580 11.67GB 做显存分段策略优化 |
+| **⑮ 性能优化** | 模型按层/模块卸载 | ⬜ 待做 | 比整体卸载更细粒度，进一步降低 OOM 风险 |
+| **⑯ 工程化** | 一键安装/配置脚本 | ⬜ 待做 | 用户无需手动改 bat，只需装插件 |
+| **⑰ 上游反馈** | 向 ComfyUI 官方提 PR 建议 | ⬜ 待做 | 将 XPU 兼容代码合并入官方，减少下游补丁依赖 |
 
 ---
 
@@ -113,7 +115,7 @@ git clone https://github.com/allanmeng/ComfyUI-AIMDO-XPU.git
 
 ```
 [ComfyUI-AIMDO-XPU] ✅ XPU hijack ACTIVE
-[ComfyUI-AIMDO-XPU] v0.1
+[ComfyUI-AIMDO-XPU] v0.5
 ```
 
 ---
@@ -155,6 +157,17 @@ DynamicVRAM support detected and enabled
 ### 方法二：工作流节点
 
 在工作流中添加 **"XPU AIMDO Status"** 节点，运行后会显示完整状态报告。
+
+### 运行时切换 DynamicVRAM
+
+XPU AIMDO Status 节点新增 `Enable_DynamicVRAM` 开关（v0.5）：
+
+- **ON** = VBAR 显存分级加载（节省 VRAM，推理较慢）
+- **OFF** = 全速全量加载（占用更多 VRAM，推理最快）
+- **删除节点** = 自动恢复 OFF
+- **debug** 勾选框开启 Proxy 诊断日志
+
+> 切换立即生效，无需重启 ComfyUI。切换 OFF 后会自动清理 VBAR 缓存和显存碎片。
 
 ---
 

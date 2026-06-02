@@ -56,7 +56,7 @@ ComfyUI-AIMDO-XPU/
 │   ├── torch.py              ← aimdo_to_tensor / hostbuf_to_tensor
 │   ├── host_buffer.py        ← HostBuffer (torch pin_memory instead of CUDA)
 │   └── model_mmap.py         ← ModelMMAP (Python mmap instead of aimdo.dll)
-├── __init__.py               ← custom_node entry; startup verification + XPUAIMDOStatus node
+├── __init__.py               ← custom_node entry; XPUAIMDOStatus node (toggle + debug)
 ├── README.md
 └── README_EN.md
 ```
@@ -77,9 +77,9 @@ ComfyUI-AIMDO-XPU/
 | **⑧ 3rd Party** | SeedVR2 plugin compat | ✅ Done | `torch.cuda.device('cuda:N')` maps to `xpu:N` |
 | **⑨ Validation** | SDXL inference | ✅ Done | DynamicVRAM active, 82s execution, no OOM |
 | **⑩ 3rd Party** | Other plugins CUDA cleanup | 🔄 WIP | Fix on demand |
-| **⑪ Stability** | Long-run / batch inference test | ⬜ Todo | Memory leak / resource leak verification |
-| **⑫ Feature** | Other ComfyUI DynamicVRAM scenarios | ⬜ Todo | e.g. Video models, Diffusion models larger than VRAM |
-| **⑬ Performance** | reserve-vram fine-tuning | ⬜ Todo | VRAM segmentation strategy for B580 11.67GB |
+| **⑪ Feature** | DynamicVRAM runtime toggle | ✅ v0.5 | Status node ON/OFF instant toggle |
+| **⑫ Stability** | Long-run / batch inference test | ⬜ Todo | Memory leak / resource leak verification |
+| **⑬ Feature** | Other ComfyUI DynamicVRAM scenarios | ⬜ Todo | e.g. Video models |
 | **⑭ Performance** | Layer/module-level model unloading | ⬜ Todo | Finer granularity than whole-model unloading |
 | **⑮ Engineering** | One-click install script | ⬜ Todo | No manual bat editing, plugin install only |
 | **⑯ Upstream** | Submit PR to ComfyUI official | ⬜ Todo | Merge XPU compat into official, reduce downstream patches |
@@ -114,7 +114,7 @@ After launching ComfyUI, check if the logs show:
 
 ```
 [ComfyUI-AIMDO-XPU] ✅ XPU hijack ACTIVE
-[ComfyUI-AIMDO-XPU] v0.1
+[ComfyUI-AIMDO-XPU] v0.5
 ```
 
 ---
@@ -154,7 +154,16 @@ DynamicVRAM support detected and enabled
 
 Add the **"XPU AIMDO Status"** node to any workflow — it displays a complete status report on execution.
 
----
+### Runtime DynamicVRAM Toggle
+
+The Status node (v0.5) includes an `Enable_DynamicVRAM` switch:
+
+- **ON** = VBAR staged loading (VRAM-efficient, slower inference)
+- **OFF** = Full-speed full load (uses more VRAM, fastest)
+- **Delete node** = auto-reverts to OFF
+- **debug** checkbox enables Proxy diagnostic logs
+
+> Toggle takes effect immediately without restarting ComfyUI. Switching OFF automatically cleans up VBAR cache and VRAM fragmentation.---
 
 ## Differences from Original
 
