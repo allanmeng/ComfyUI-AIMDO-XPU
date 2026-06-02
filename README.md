@@ -1,10 +1,12 @@
-# Intel XPU 版动态模型卸载器（comfy-aimdo XPU 替代实现）
+# ComfyUI-AIMDO-XPU
+
+Intel XPU 版动态模型卸载器（comfy-aimdo XPU 替代实现）
 
 > 本质是通过调整模型的加载方式，提高显存利用率，降低OOM发生的几率
 > 简单来说：OFF（全量加载）是“空间换时间”，而 ON（DynamicVRAM / dyvram）是“时间换空间”。
 
-[**English**](README_EN.md) | 中文
 
+[**English**](README_EN.md) | 中文
 
 ---
 
