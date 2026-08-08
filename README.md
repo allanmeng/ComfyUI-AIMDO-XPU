@@ -31,9 +31,11 @@ comfy-aimdo（Rattus 著，v0.2.12）是 ComfyUI 的 DynamicVRAM 功能核心依
 
 ## ComfyUI-AIMDO-XPU 项目介绍
 
-### 【新方案尝试】DLL 后端（Level Zero 硬件级）
+<div style="background-color:#eef6ff; border:1px solid #b8d4f0; border-left:6px solid #378ADD; border-radius:8px; padding:16px 20px; margin:16px 0;">
 
-> 🆕 这是本项目的一次新尝试：**以预编译 DLL 的形式提供硬件级 DynamicVRAM 后端**，
+### 🆕 【新方案尝试】DLL 后端（Level Zero 硬件级）
+
+> 这是本项目的一次新尝试：**以预编译 DLL 的形式提供硬件级 DynamicVRAM 后端**，
 > 与下方原有的纯 Python 劫持方案互补。目前以 **Release 试点** 形式发布，
 > 欢迎试用并反馈。
 
@@ -83,6 +85,8 @@ comfy-aimdo（Rattus 著，v0.2.12）是 ComfyUI 的 DynamicVRAM 功能核心依
 - 解压后按包内 `README-DEPLOY-CN.md` / `README-DEPLOY-EN.md` 操作即可；
 - ⚠️ 如果你之前使用过本插件的劫持版，请先按部署文档开头的"升级提示"清理，
   否则 DLL 不会生效。
+
+</div>
 
 ---
 

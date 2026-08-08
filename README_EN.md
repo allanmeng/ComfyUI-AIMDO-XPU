@@ -30,9 +30,11 @@ comfy-aimdo (by Rattus, v0.2.12) is the core dependency of ComfyUI's DynamicVRAM
 
 ## About ComfyUI-AIMDO-XPU
 
-### 【New Pilot】DLL Backend (Level Zero, Hardware-level)
+<div style="background-color:#eef6ff; border:1px solid #b8d4f0; border-left:6px solid #378ADD; border-radius:8px; padding:16px 20px; margin:16px 0;">
 
-> 🆕 This is a new pilot of this project: providing a **hardware-level DynamicVRAM
+### 🆕 【New Pilot】DLL Backend (Level Zero, Hardware-level)
+
+> This is a new pilot of this project: providing a **hardware-level DynamicVRAM
 > backend as a precompiled DLL**, complementing the pure-Python hijack approach below.
 > It is currently distributed as a **Release pilot** — feel free to try it and give feedback.
 
@@ -83,6 +85,8 @@ comfy-aimdo (by Rattus, v0.2.12) is the core dependency of ComfyUI's DynamicVRAM
 - Unzip and follow `README-DEPLOY-CN.md` / `README-DEPLOY-EN.md` inside the package;
 - ⚠️ If you previously used the hijack version of this plugin, clean it up first per the
   "upgrade notice" at the top of the deployment doc, or the DLL will not take effect.
+
+</div>
 
 ---
 
