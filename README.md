@@ -31,7 +31,7 @@ comfy-aimdo（Rattus 著，v0.2.12）是 ComfyUI 的 DynamicVRAM 功能核心依
 
 ## ComfyUI-AIMDO-XPU 项目介绍
 
-<div style="background-color:#eef6ff; border:1px solid #b8d4f0; border-left:6px solid #378ADD; border-radius:8px; padding:16px 20px; margin:16px 0;">
+<div style="background-color:#000000; border:1px solid #b8d4f0; border-left:6px solid #378ADD; border-radius:8px; padding:16px 20px; margin:16px 0;">
 
 ### 🆕 【新方案尝试】DLL 后端（Level Zero 硬件级）
 
