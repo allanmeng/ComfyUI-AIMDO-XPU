@@ -32,6 +32,41 @@ comfy-aimdo (by Rattus, v0.2.12) is the core dependency of ComfyUI's DynamicVRAM
 
 This project reimplements the above capabilities on Intel XPU with the same Python API interface, **without modifying ComfyUI's official code**.
 
+### 【New Pilot】DLL Backend (Level Zero, Hardware-level)
+
+> 🆕 This is a new pilot of this project: providing a **hardware-level DynamicVRAM
+> backend as a precompiled DLL**, complementing the pure-Python hijack approach below.
+> It is currently distributed as a **Release pilot** — feel free to try it and give feedback.
+
+**Origin & Principle**
+
+- The DLL backend is based on the community project `xiangyuT/comfy-aimdo-xpu`
+  (Intel **Level Zero** + oneAPI SYCL implementation, branch `dev/xpu-level-zero-vbar`),
+  compiled for Windows as `aimdo_xpu.dll`;
+- Unlike the Python hijack approach's "LRU tensor cache simulation", the DLL backend uses
+  **real Level Zero virtual address reservation (VBAR) + page-fault fault-in**, closer to the
+  hardware behavior of the original NVIDIA comfy-aimdo;
+- It takes effect by replacing the `comfy_aimdo` package in `site-packages`, not via PYTHONPATH hijack.
+
+**Comparison with the hijack approach**
+
+| Dimension | Python Hijack (default) | DLL Backend (pilot) |
+|---|---|---|
+| Implementation | Pure Python, zero compilation | Precompiled C/C++ (Level Zero + SYCL) |
+| VBAR mechanism | LRU cache + watermark eviction (software) | Real virtual address reservation + fault-in (hardware) |
+| Deployment | custom_nodes + PYTHONPATH hijack | Deploy to site-packages (replace official package) |
+| Dependencies | No compilation dependency | Requires oneAPI 2026.1 (matching the build) |
+| Performance focus | Lightweight, easy to share | Closer to original aimdo performance |
+
+**How to try the DLL backend**
+
+- Download the latest release package (`comfy_aimdo_xpu_win_v*.zip`) from **GitHub Releases**;
+- Unzip and follow `README-DEPLOY-CN.md` / `README-DEPLOY-EN.md` inside the package;
+- ⚠️ If you previously used the hijack version of this plugin, clean it up first per the
+  "upgrade notice" at the top of the deployment doc, or the DLL will not take effect.
+
+---
+
 ### Architecture Decision: PYTHONPATH Hijack
 
 The official comfy-aimdo is installed in `site-packages/comfy_aimdo/`. This project places a same-named `comfy_aimdo/` package under `custom_nodes/`, and uses the launch script to prepend the project path to `PYTHONPATH`, so `import comfy_aimdo` hits our project first, achieving transparent replacement.
@@ -63,29 +98,6 @@ ComfyUI-AIMDO-XPU/
 ├── README.md
 └── README_EN.md
 ```
-
----
-
-## Milestones
-
-| Phase | Milestone | Status | Notes |
-|------|-----------|--------|-------|
-| **① Foundation** | PYTHONPATH hijack channel | ✅ Done | `comfy_aimdo/` takes priority over `site-packages` |
-| **② Remove CUDA** | `torch.cuda` global shim | ✅ Done | `_lazy_init`, `device()`, `get_device_properties` all intercepted |
-| **③ Remove CUDA** | `is_nvidia()` DynamicVRAM guard | ✅ Done | XPU can trigger ComfyUI's DynamicVRAM init logic |
-| **④ Core API** | VBAR virtual address page fault simulation | ✅ Done | `model_vbar.py` LRU cache replaces aimdo.dll VBAR |
-| **⑤ Core API** | Pin Memory alignment | ✅ Done | `host_buffer.py` uses `torch.empty(pin_memory=True)` |
-| **⑥ Core API** | File mapping alignment | ✅ Done | `model_mmap.py` uses Python `mmap` |
-| **⑦ 3rd Party** | XPUSYSMonitor plugin compat | ✅ Done | `torch.cuda.is_available()` catches AssertionError |
-| **⑧ 3rd Party** | SeedVR2 plugin compat | ✅ Done | `torch.cuda.device('cuda:N')` maps to `xpu:N` |
-| **⑨ Validation** | SDXL inference | ✅ Done | DynamicVRAM active, 82s execution, no OOM |
-| **⑩ 3rd Party** | Other plugins CUDA cleanup | 🔄 WIP | Fix on demand |
-| **⑪ Feature** | DynamicVRAM runtime toggle | ✅ v0.5 | Status node ON/OFF instant toggle |
-| **⑫ Stability** | Long-run / batch inference test | ⬜ Todo | Memory leak / resource leak verification |
-| **⑬ Feature** | Other ComfyUI DynamicVRAM scenarios | ⬜ Todo | e.g. Video models |
-| **⑭ Performance** | Layer/module-level model unloading | ⬜ Todo | Finer granularity than whole-model unloading |
-| **⑮ Engineering** | One-click install script | ⬜ Todo | No manual bat editing, plugin install only |
-| **⑯ Upstream** | Submit PR to ComfyUI official | ⬜ Todo | Merge XPU compat into official, reduce downstream patches |
 
 ---
 

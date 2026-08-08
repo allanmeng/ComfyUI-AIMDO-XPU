@@ -33,6 +33,39 @@ comfy-aimdo（Rattus 著，v0.2.12）是 ComfyUI 的 DynamicVRAM 功能核心依
 
 本项目以相同的 Python API 接口，在 Intel XPU 上重新实现上述能力，**无需修改 ComfyUI 官方代码**。
 
+### 【新方案尝试】DLL 后端（Level Zero 硬件级）
+
+> 🆕 这是本项目的一次新尝试：**以预编译 DLL 的形式提供硬件级 DynamicVRAM 后端**，
+> 与下方原有的纯 Python 劫持方案互补。目前以 **Release 试点** 形式发布，
+> 欢迎试用并反馈。
+
+**来源与原理**
+
+- DLL 后端基于社区项目 `xiangyuT/comfy-aimdo-xpu` 的 `dev/xpu-level-zero-vbar` 分支
+  （Intel **Level Zero** + oneAPI SYCL 实现），在 Windows 上编译为 `aimdo_xpu.dll`；
+- 与 Python 劫持方案的"LRU 张量缓存模拟"不同，DLL 后端使用**真实的 Level Zero 虚拟地址预留
+  （VBAR）+ 缺页换入机制**，更接近 NVIDIA 原版 comfy-aimdo 的硬件行为；
+- 它通过替换 `site-packages` 中的 `comfy_aimdo` 包生效，而不是 PYTHONPATH 劫持。
+
+**与劫持方案对比**
+
+| 维度 | Python 劫持方案（默认） | DLL 后端方案（试点） |
+|---|---|---|
+| 实现方式 | 纯 Python，零编译 | 预编译 C/C++（Level Zero + SYCL） |
+| VBAR 机制 | LRU 缓存 + watermark 驱逐（软件模拟） | 真实虚拟地址预留 + 缺页换入（硬件级） |
+| 部署方式 | custom_nodes + PYTHONPATH 劫持 | 部署到 site-packages（替换官方包） |
+| 依赖 | 无编译依赖 | 需 oneAPI 2026.1（与编译版本一致） |
+| 性能取向 | 轻量、易分享 | 更贴近原版 aimdo 性能 |
+
+**如何尝试 DLL 方案**
+
+- 从 **GitHub Releases** 下载最新发布包（`comfy_aimdo_xpu_win_v*.zip`）；
+- 解压后按包内 `README-DEPLOY-CN.md` / `README-DEPLOY-EN.md` 操作即可；
+- ⚠️ 如果你之前使用过本插件的劫持版，请先按部署文档开头的"升级提示"清理，
+  否则 DLL 不会生效。
+
+---
+
 ### 架构决策：PYTHONPATH 劫持
 
 官方 comfy-aimdo 安装在 `site-packages/comfy_aimdo/`，本项目在 custom_nodes 目录下放置同名 `comfy_aimdo/` 包，通过启动脚本将项目路径加入 `PYTHONPATH` 最前面，使 `import comfy_aimdo` 优先命中本项目，实现透明替换。
@@ -64,30 +97,6 @@ ComfyUI-AIMDO-XPU/
 ├── __init__.py               ← custom_node 入口；含 XPUAIMDOStatus 节点（开关 + debug）
 └── README.md
 ```
-
----
-
-## 里程碑列表
-
-| 阶段 | 里程碑 | 状态 | 说明 |
-|------|--------|------|------|
-| **① 基础路基** | PYTHONPATH 劫持通道打通 | ✅ 已完成 | `comfy_aimdo/` 包优先于 `site-packages` 官方版被加载 |
-| **② 清除 CUDA 硬编码** | `torch.cuda` 全局 shim | ✅ 已完成 | `_lazy_init`、`device()`、`get_device_properties` 等全部拦截 |
-| **③ 清除 CUDA 硬编码** | `is_nvidia()` DynamicVRAM 门卫 | ✅ 已完成 | 让 XPU 也能触发 ComfyUI 的 DynamicVRAM 初始化逻辑 |
-| **④ 核心 API 对齐** | VBAR 虚拟地址缺页模拟 | ✅ 已完成 | `model_vbar.py` LRU 缓存替代 aimdo.dll VBAR 机制 |
-| **⑤ 核心 API 对齐** | Pin Memory 对齐 | ✅ 已完成 | `host_buffer.py` 用 `torch.empty(pin_memory=True)` 替代 `cudaHostAlloc` |
-| **⑥ 核心 API 对齐** | 文件映射对齐 | ✅ 已完成 | `model_mmap.py` 用 Python `mmap` 替代 Windows `VirtualAlloc + CreateFileMapping` |
-| **⑦ 第三方兼容** | XPUSYSMonitor 插件兼容 | ✅ 已完成 | `torch.cuda.is_available()` 捕获 AssertionError 返回 False |
-| **⑧ 第三方兼容** | SeedVR2 插件兼容 | ✅ 已完成 | `torch.cuda.device('cuda:N')` 映射到 `xpu:N` |
-| **⑨ 功能验证** | SDXL 推理跑通 | ✅ 已完成 | DynamicVRAM 开启，82s 执行，无 OOM |
-| **⑩ 第三方兼容** | 其他插件 CUDA 硬编码清理 | 🔄 进行中 | 按需发现、按需修复 |
-| **⑪ 功能补全** | DynamicVRAM 运行时开关 | ✅ v0.5 | Status 节点 ON/OFF 即时切换 |
-| **⑫ 稳定性验证** | 长时间/大批量推理测试 | ⬜ 待做 | 验证无内存泄漏、无资源泄露 |
-| **⑬ 功能补全** | ComfyUI 其他 DynamicVRAM 场景 | ⬜ 待做 | 如 Video models、Diffusion models larger than VRAM |
-| **⑭ 性能优化** | reserve-vram 精细化调优 | ⬜ 待做 | 针对 B580 11.67GB 做显存分段策略优化 |
-| **⑮ 性能优化** | 模型按层/模块卸载 | ⬜ 待做 | 比整体卸载更细粒度，进一步降低 OOM 风险 |
-| **⑯ 工程化** | 一键安装/配置脚本 | ⬜ 待做 | 用户无需手动改 bat，只需装插件 |
-| **⑰ 上游反馈** | 向 ComfyUI 官方提 PR 建议 | ⬜ 待做 | 将 XPU 兼容代码合并入官方，减少下游补丁依赖 |
 
 ---
 
