@@ -99,7 +99,7 @@ comfy-aimdo（Rattus 著，v0.2.12）是 ComfyUI 的 DynamicVRAM 功能核心依
 
 > **为什么不用 custom_node __init__.py 做劫持？** `main.py` 第 34 行的 `import comfy.aimdo.control` 早于 custom_nodes 加载，custom_nodes 的 `__init__.py` 介入时已经太晚了。
 
-### 替代策略
+#### 替代策略
 
 | 原版 CUDA 机制 | XPU 替代实现 |
 |---|---|
@@ -109,7 +109,7 @@ comfy-aimdo（Rattus 著，v0.2.12）是 ComfyUI 的 DynamicVRAM 功能核心依
 | `VirtualAlloc + CreateFileMapping` | Python `mmap` 模块 |
 | CUDA 设备属性查询 | `torch.xpu.get_device_properties()` |
 
-### 项目结构
+#### 项目结构
 
 ```
 ComfyUI-AIMDO-XPU/
@@ -127,29 +127,29 @@ ComfyUI-AIMDO-XPU/
 
 ---
 
-## 下载与安装
+#### 下载与安装
 
-### 方式一：Git Clone（推荐）
+##### 方式一：Git Clone（推荐）
 
 ```batch
 cd f:\ComfyUI-aki-v3\ComfyUI\custom_nodes
 git clone https://github.com/allanmeng/ComfyUI-AIMDO-XPU.git
 ```
 
-### 方式二：下载 ZIP
+##### 方式二：下载 ZIP
 
 1. 访问 [GitHub 仓库](https://github.com/allanmeng/ComfyUI-AIMDO-XPU)
 2. 点击 **Code** → **Download ZIP**
 3. 解压到 `ComfyUI/custom_nodes/ComfyUI-AIMDO-XPU` 目录
 
-### 前置要求
+##### 前置要求
 
 - Intel Arc B 系列显卡（B580 / B570 等）
 - Intel oneAPI Base Toolkit（提供 oneMKL 和 SYCL 运行时）
 - PyTorch XPU 版本：`pip install torch --index-url https://download.pytorch.org/whl/xpu`
 - ComfyUI-aki-v3 或其他支持 Intel XPU 的 ComfyUI 发行版
 
-### 验证安装
+##### 验证安装
 
 启动 ComfyUI 后，查看日志中是否出现：
 
@@ -160,7 +160,7 @@ git clone https://github.com/allanmeng/ComfyUI-AIMDO-XPU.git
 
 ---
 
-## 激活方式
+#### 激活方式
 
 在启动 ComfyUI **之前**，将本项目根目录赋值到 `PYTHONPATH` ，放到bat启动文件中， main.py的前面：
 
@@ -178,11 +178,11 @@ set "PYTHONPATH=%~dp0ComfyUI\custom_nodes\ComfyUI-AIMDO-XPU;%PYTHONPATH%"
 > `import comfy_aimdo` 会优先找到本目录下的 `comfy_aimdo/` 包，
 > 而不是 `site-packages` 中的官方 CUDA 版本。
 
-### 如何禁用劫持
+##### 如何禁用劫持
 
 注释掉上述 `set PYTHONPATH` 行即可切回官方 comfy-aimdo（CUDA），用于对比测试。
 
-### 工作台中切换 DynamicVRAM
+##### 工作台中切换 DynamicVRAM
 
 XPU AIMDO Status 节点新增 `Enable_DynamicVRAM` 开关（v0.5）：
 
@@ -206,9 +206,9 @@ XPU AIMDO Status 节点新增 `Enable_DynamicVRAM` 开关（v0.5）：
 
 ---
 
-## 验证方法
+#### 验证方法
 
-### 方法一：查看启动日志
+##### 方法一：查看启动日志
 
 ```
 [ComfyUI-AIMDO-XPU] ✅ XPU hijack ACTIVE  →  ...ComfyUI-AIMDO-XPU\comfy_aimdo\__init__.py
@@ -216,13 +216,13 @@ XPU AIMDO Status 节点新增 `Enable_DynamicVRAM` 开关（v0.5）：
 DynamicVRAM support detected and enabled
 ```
 
-### 方法二：工作流节点
+##### 方法二：工作流节点
 
 在工作流中添加 **"XPU AIMDO Status"** 节点，运行后日志中会显示完整状态报告。
 
 ---
 
-## 与原版的差异
+#### 与原版的差异
 
 - **无硬件级缺页中断（VBAR）**：改为 Python 层 LRU 换入/换出，性能略低但功能等价
 - **不依赖任何 CUDA 组件**
@@ -231,9 +231,9 @@ DynamicVRAM support detected and enabled
 
 ---
 
-## 已知限制
+#### 已知限制
 
-### ❌ 不支持 NF4 / FP4 量化
+##### ❌ 不支持 NF4 / FP4 量化
 
 Intel XPU（Arc B 系列）**不支持** NF4 / FP4 量化推理。原因：`bitsandbytes.matmul_4bit` 底层调用 CUDA-specific kernel，XPU 后端无对应实现。
 

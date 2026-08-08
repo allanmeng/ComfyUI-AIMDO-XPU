@@ -99,7 +99,7 @@ The official comfy-aimdo is installed in `site-packages/comfy_aimdo/`. This proj
 
 > **Why not hijack via custom_node __init__.py?** `main.py` line 34's `import comfy.aimdo.control` runs before custom_nodes are loaded — custom_nodes `__init__.py` is already too late.
 
-### Replacement Strategy
+#### Replacement Strategy
 
 | Original CUDA Mechanism | XPU Replacement |
 |---|---|
@@ -109,7 +109,7 @@ The official comfy-aimdo is installed in `site-packages/comfy_aimdo/`. This proj
 | `VirtualAlloc + CreateFileMapping` | Python `mmap` module |
 | CUDA device property query | `torch.xpu.get_device_properties()` |
 
-### Project Structure
+#### Project Structure
 
 ```
 ComfyUI-AIMDO-XPU/
@@ -127,29 +127,29 @@ ComfyUI-AIMDO-XPU/
 
 ---
 
-## Download & Installation
+#### Download & Installation
 
-### Method 1: Git Clone (Recommended)
+##### Method 1: Git Clone (Recommended)
 
 ```batch
 cd f:\ComfyUI-aki-v3\ComfyUI\custom_nodes
 git clone https://github.com/allanmeng/ComfyUI-AIMDO-XPU.git
 ```
 
-### Method 2: Download ZIP
+##### Method 2: Download ZIP
 
 1. Visit the [GitHub repository](https://github.com/allanmeng/ComfyUI-AIMDO-XPU)
 2. Click **Code** → **Download ZIP**
 3. Extract to `ComfyUI/custom_nodes/ComfyUI-AIMDO-XPU` directory
 
-### Prerequisites
+##### Prerequisites
 
 - Intel Arc B-Series GPU (B580 / B570 etc.)
 - Intel oneAPI Base Toolkit (provides oneMKL and SYCL runtime)
 - PyTorch XPU version: `pip install torch --index-url https://download.pytorch.org/whl/xpu`
 - ComfyUI-aki-v3 or other ComfyUI distribution with Intel XPU support
 
-### Verify Installation
+##### Verify Installation
 
 After launching ComfyUI, check if the logs show:
 
@@ -160,7 +160,7 @@ After launching ComfyUI, check if the logs show:
 
 ---
 
-## Activation
+#### Activation
 
 Add this project's root to `PYTHONPATH` **before** launching ComfyUI:
 
@@ -175,11 +175,11 @@ set "PYTHONPATH=%~dp0ComfyUI\custom_nodes\ComfyUI-AIMDO-XPU;%PYTHONPATH%"
 > `import comfy_aimdo` will find our local `comfy_aimdo/` package first,
 > not the official CUDA version in `site-packages`.
 
-### How to Disable
+##### How to Disable
 
 Comment out the `set PYTHONPATH` line to switch back to official comfy-aimdo (CUDA) for comparison testing.
 
-### Toggle DynamicVRAM in the Workflow
+##### Toggle DynamicVRAM in the Workflow
 
 The XPU AIMDO Status node (v0.5) includes an `Enable_DynamicVRAM` switch:
 
@@ -200,9 +200,9 @@ The XPU AIMDO Status node (v0.5) includes an `Enable_DynamicVRAM` switch:
 
 ---
 
-## Verification
+#### Verification
 
-### Method 1: Check Startup Logs
+##### Method 1: Check Startup Logs
 
 ```
 [ComfyUI-AIMDO-XPU] ✅ XPU hijack ACTIVE  →  ...ComfyUI-AIMDO-XPU\comfy_aimdo\__init__.py
@@ -210,11 +210,11 @@ The XPU AIMDO Status node (v0.5) includes an `Enable_DynamicVRAM` switch:
 DynamicVRAM support detected and enabled
 ```
 
-### Method 2: Workflow Node
+##### Method 2: Workflow Node
 
 Add the **"XPU AIMDO Status"** node to any workflow — the status report will appear in the startup logs.---
 
-## Differences from Original
+#### Differences from Original
 
 - **No hardware-level page fault interrupts (VBAR)**: Python-layer LRU fault-in/fault-out instead; slightly lower performance but functionally equivalent
 - **No CUDA dependencies whatsoever**
@@ -223,9 +223,9 @@ Add the **"XPU AIMDO Status"** node to any workflow — the status report will a
 
 ---
 
-## Known Limitations
+#### Known Limitations
 
-### ❌ NF4 / FP4 Quantization Not Supported
+##### ❌ NF4 / FP4 Quantization Not Supported
 
 Intel XPU (Arc B-Series) **does not support** NF4 / FP4 quantization inference. Reason: `bitsandbytes.matmul_4bit` calls a CUDA-specific kernel; no corresponding implementation exists for the XPU backend.
 
