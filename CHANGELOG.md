@@ -1,5 +1,21 @@
 # 更新日志
 
+## v1.0-alpha (2026-08-08)
+
+### 新增
+- **【新方案尝试】DLL 后端（Level Zero 硬件级）** — 以预编译 `aimdo_xpu.dll` 形式提供硬件级 DynamicVRAM 后端
+  - 基于社区项目 `xiangyuT/comfy-aimdo-xpu` 的 `dev/xpu-level-zero-vbar` 分支构建
+  - 使用真实的 Level Zero 虚拟地址预留（VBAR）+ 缺页换入机制，更接近 NVIDIA 原版 aimdo
+  - 通过替换 `site-packages` 中的 `comfy_aimdo` 包生效（deploy.bat 自动备份，可回退）
+  - 以 **GitHub Release 试点** 形式发布，详见 README 中【新方案尝试】章节
+- 新增 `release/comfy_aimdo_xpu_win_v0.4.13.zip` 发布包（含中英文部署文档）
+
+### 文档
+- README 删除里程碑列表
+- README 项目介绍新增【新方案尝试】DLL 后端章节（来源 / 原理 / 环境要求 / 与劫持方案对比 / 如何尝试）
+- "架构决策：PYTHONPATH 劫持" 更名为 "原方案架构决策：PYTHONPATH 劫持"，明确与 DLL 新方案的定位区分
+- 更新 README_EN.md 与中文版同步
+
 ## v0.5 (2026-06-02)
 
 ### 新增

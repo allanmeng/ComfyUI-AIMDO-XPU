@@ -31,21 +31,41 @@ comfy-aimdo（Rattus 著，v0.2.12）是 ComfyUI 的 DynamicVRAM 功能核心依
 
 ## ComfyUI-AIMDO-XPU 项目介绍
 
-本项目以相同的 Python API 接口，在 Intel XPU 上重新实现上述能力，**无需修改 ComfyUI 官方代码**。
-
 ### 【新方案尝试】DLL 后端（Level Zero 硬件级）
 
 > 🆕 这是本项目的一次新尝试：**以预编译 DLL 的形式提供硬件级 DynamicVRAM 后端**，
 > 与下方原有的纯 Python 劫持方案互补。目前以 **Release 试点** 形式发布，
 > 欢迎试用并反馈。
 
-**来源与原理**
+**方案来源**
 
-- DLL 后端基于社区项目 `xiangyuT/comfy-aimdo-xpu` 的 `dev/xpu-level-zero-vbar` 分支
-  （Intel **Level Zero** + oneAPI SYCL 实现），在 Windows 上编译为 `aimdo_xpu.dll`；
+- 基于社区项目 `xiangyuT/comfy-aimdo-xpu`
+  （<https://github.com/xiangyuT/comfy-aimdo-xpu>）的 `dev/xpu-level-zero-vbar` 分支构建，
+  该分支提供 Intel **Level Zero** + oneAPI SYCL 的硬件级实现；
+- 本仓库在其基础上，针对 Windows 编译为 `aimdo_xpu.dll`，并通过 Release 发布试点，
+  便于 Windows 用户直接下载使用。
+
+**方案原理**
+
 - 与 Python 劫持方案的"LRU 张量缓存模拟"不同，DLL 后端使用**真实的 Level Zero 虚拟地址预留
   （VBAR）+ 缺页换入机制**，更接近 NVIDIA 原版 comfy-aimdo 的硬件行为；
-- 它通过替换 `site-packages` 中的 `comfy_aimdo` 包生效，而不是 PYTHONPATH 劫持。
+- 它通过**替换 `site-packages` 中的 `comfy_aimdo` 包**生效，而不是 PYTHONPATH 劫持。
+
+**⚠️ 注意事项：会修改 / 替换官方 aimdo 文件**
+
+- 本方案会**覆盖（替换）** `site-packages/comfy_aimdo/` 下的官方文件
+  （`control.py`、`torch.py` 等 6 个 py + `aimdo_xpu.dll`）；
+- `deploy.bat` 会自动备份原包为 `comfy_aimdo.bak`，可随时回退；
+- **该 DLL 方案与下方的 PYTHONPATH 劫持方案互斥，二者只能启用其一**。
+
+**使用该方案需要准备的环境**
+
+| # | 环境要求 | 说明 |
+|---|---------|------|
+| 1 | Intel Arc 显卡（B580 / A770 / A750 等） | 已安装最新 Intel 显卡驱动 |
+| 2 | ComfyUI-aki 整合包（Intel ARC 版） | 内置 torch 2.13.0+xpu 等 XPU 环境 |
+| 3 | Intel oneAPI 2026.1 | 必须与本包编译版本一致 |
+| 4 | Windows 11 / 10（64 位） | |
 
 **与劫持方案对比**
 
@@ -66,7 +86,9 @@ comfy-aimdo（Rattus 著，v0.2.12）是 ComfyUI 的 DynamicVRAM 功能核心依
 
 ---
 
-### 架构决策：PYTHONPATH 劫持
+### 原方案架构决策：PYTHONPATH 劫持
+
+原方案以相同的 Python API 接口，在 Intel XPU 上重新实现上述能力，**无需修改 ComfyUI 官方代码**。
 
 官方 comfy-aimdo 安装在 `site-packages/comfy_aimdo/`，本项目在 custom_nodes 目录下放置同名 `comfy_aimdo/` 包，通过启动脚本将项目路径加入 `PYTHONPATH` 最前面，使 `import comfy_aimdo` 优先命中本项目，实现透明替换。
 

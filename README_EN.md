@@ -30,23 +30,42 @@ comfy-aimdo (by Rattus, v0.2.12) is the core dependency of ComfyUI's DynamicVRAM
 
 ## About ComfyUI-AIMDO-XPU
 
-This project reimplements the above capabilities on Intel XPU with the same Python API interface, **without modifying ComfyUI's official code**.
-
 ### 【New Pilot】DLL Backend (Level Zero, Hardware-level)
 
 > 🆕 This is a new pilot of this project: providing a **hardware-level DynamicVRAM
 > backend as a precompiled DLL**, complementing the pure-Python hijack approach below.
 > It is currently distributed as a **Release pilot** — feel free to try it and give feedback.
 
-**Origin & Principle**
+**Origin**
 
-- The DLL backend is based on the community project `xiangyuT/comfy-aimdo-xpu`
-  (Intel **Level Zero** + oneAPI SYCL implementation, branch `dev/xpu-level-zero-vbar`),
-  compiled for Windows as `aimdo_xpu.dll`;
+- Built from the community project `xiangyuT/comfy-aimdo-xpu`
+  (<https://github.com/xiangyuT/comfy-aimdo-xpu>), branch `dev/xpu-level-zero-vbar`,
+  which provides an Intel **Level Zero** + oneAPI SYCL hardware-level implementation;
+- This repository compiles it for Windows as `aimdo_xpu.dll` and publishes it via
+  Release as a pilot, so Windows users can download and use it directly.
+
+**Principle**
+
 - Unlike the Python hijack approach's "LRU tensor cache simulation", the DLL backend uses
   **real Level Zero virtual address reservation (VBAR) + page-fault fault-in**, closer to the
   hardware behavior of the original NVIDIA comfy-aimdo;
-- It takes effect by replacing the `comfy_aimdo` package in `site-packages`, not via PYTHONPATH hijack.
+- It takes effect by **replacing the `comfy_aimdo` package in `site-packages`**, not via PYTHONPATH hijack.
+
+**⚠️ Note: this modifies / replaces official aimdo files**
+
+- This approach **overwrites (replaces)** the official files under
+  `site-packages/comfy_aimdo/` (`control.py`, `torch.py` and 4 other .py + `aimdo_xpu.dll`);
+- `deploy.bat` automatically backs up the original package to `comfy_aimdo.bak` for rollback;
+- **This DLL approach is mutually exclusive with the PYTHONPATH hijack approach below — only one can be active.**
+
+**Required environment**
+
+| # | Requirement | Notes |
+|---|-------------|-------|
+| 1 | Intel Arc GPU (B580 / A770 / A750, etc.) | Latest Intel graphics driver installed |
+| 2 | ComfyUI-aki package (Intel ARC edition) | Bundles torch 2.13.0+xpu XPU environment |
+| 3 | Intel oneAPI 2026.1 | Must match the build version of this package |
+| 4 | Windows 11 / 10 (64-bit) | |
 
 **Comparison with the hijack approach**
 
@@ -67,7 +86,9 @@ This project reimplements the above capabilities on Intel XPU with the same Pyth
 
 ---
 
-### Architecture Decision: PYTHONPATH Hijack
+### Original Architecture Decision: PYTHONPATH Hijack
+
+The original approach reimplements the above capabilities on Intel XPU with the same Python API interface, **without modifying ComfyUI's official code**.
 
 The official comfy-aimdo is installed in `site-packages/comfy_aimdo/`. This project places a same-named `comfy_aimdo/` package under `custom_nodes/`, and uses the launch script to prepend the project path to `PYTHONPATH`, so `import comfy_aimdo` hits our project first, achieving transparent replacement.
 
