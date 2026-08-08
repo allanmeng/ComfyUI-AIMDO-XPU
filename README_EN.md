@@ -30,11 +30,10 @@ comfy-aimdo (by Rattus, v0.2.12) is the core dependency of ComfyUI's DynamicVRAM
 
 ## About ComfyUI-AIMDO-XPU
 
-<div style="background-color:#eef6ff; border:1px solid #b8d4f0; border-left:6px solid #378ADD; border-radius:8px; padding:16px 20px; margin:16px 0;">
-
 ### 🆕 【New Pilot】DLL Backend (Level Zero, Hardware-level)
 
-> This is a new pilot of this project: providing a **hardware-level DynamicVRAM
+> [!NOTE]
+> **This is a new pilot of this project**: providing a **hardware-level DynamicVRAM
 > backend as a precompiled DLL**, complementing the pure-Python hijack approach below.
 > It is currently distributed as a **Release pilot** — feel free to try it and give feedback.
 
@@ -53,12 +52,13 @@ comfy-aimdo (by Rattus, v0.2.12) is the core dependency of ComfyUI's DynamicVRAM
   hardware behavior of the original NVIDIA comfy-aimdo;
 - It takes effect by **replacing the `comfy_aimdo` package in `site-packages`**, not via PYTHONPATH hijack.
 
-**⚠️ Note: this modifies / replaces official aimdo files**
-
-- This approach **overwrites (replaces)** the official files under
-  `site-packages/comfy_aimdo/` (`control.py`, `torch.py` and 4 other .py + `aimdo_xpu.dll`);
-- `deploy.bat` automatically backs up the original package to `comfy_aimdo.bak` for rollback;
-- **This DLL approach is mutually exclusive with the PYTHONPATH hijack approach below — only one can be active.**
+> [!CAUTION]
+> **Note: this modifies / replaces official aimdo files**
+>
+> - This approach **overwrites (replaces)** the official files under
+>   `site-packages/comfy_aimdo/` (`control.py`, `torch.py` and 4 other .py + `aimdo_xpu.dll`);
+> - `deploy.bat` automatically backs up the original package to `comfy_aimdo.bak` for rollback;
+> - **This DLL approach is mutually exclusive with the PYTHONPATH hijack approach below — only one can be active.**
 
 **Required environment**
 
@@ -81,12 +81,13 @@ comfy-aimdo (by Rattus, v0.2.12) is the core dependency of ComfyUI's DynamicVRAM
 
 **How to try the DLL backend**
 
-- Download the latest release package (`comfy_aimdo_xpu_win_v*.zip`) from **GitHub Releases**;
-- Unzip and follow `README-DEPLOY-CN.md` / `README-DEPLOY-EN.md` inside the package;
-- ⚠️ If you previously used the hijack version of this plugin, clean it up first per the
-  "upgrade notice" at the top of the deployment doc, or the DLL will not take effect.
+> [!TIP]
+> - Download the latest release package (`comfy_aimdo_xpu_win_v*.zip`) from **GitHub Releases**;
+> - Unzip and follow `README-DEPLOY-CN.md` / `README-DEPLOY-EN.md` inside the package;
+> - ⚠️ If you previously used the hijack version of this plugin, clean it up first per the
+>   "upgrade notice" at the top of the deployment doc, or the DLL will not take effect.
 
-</div>
+---
 
 ---
 

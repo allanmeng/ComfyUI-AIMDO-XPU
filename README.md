@@ -31,11 +31,10 @@ comfy-aimdo（Rattus 著，v0.2.12）是 ComfyUI 的 DynamicVRAM 功能核心依
 
 ## ComfyUI-AIMDO-XPU 项目介绍
 
-<div style="background-color:#000000; border:1px solid #b8d4f0; border-left:6px solid #378ADD; border-radius:8px; padding:16px 20px; margin:16px 0;">
-
 ### 🆕 【新方案尝试】DLL 后端（Level Zero 硬件级）
 
-> 这是本项目的一次新尝试：**以预编译 DLL 的形式提供硬件级 DynamicVRAM 后端**，
+> [!NOTE]
+> **这是本项目的一次新尝试**：以预编译 DLL 的形式提供硬件级 DynamicVRAM 后端，
 > 与下方原有的纯 Python 劫持方案互补。目前以 **Release 试点** 形式发布，
 > 欢迎试用并反馈。
 
@@ -53,12 +52,13 @@ comfy-aimdo（Rattus 著，v0.2.12）是 ComfyUI 的 DynamicVRAM 功能核心依
   （VBAR）+ 缺页换入机制**，更接近 NVIDIA 原版 comfy-aimdo 的硬件行为；
 - 它通过**替换 `site-packages` 中的 `comfy_aimdo` 包**生效，而不是 PYTHONPATH 劫持。
 
-**⚠️ 注意事项：会修改 / 替换官方 aimdo 文件**
-
-- 本方案会**覆盖（替换）** `site-packages/comfy_aimdo/` 下的官方文件
-  （`control.py`、`torch.py` 等 6 个 py + `aimdo_xpu.dll`）；
-- `deploy.bat` 会自动备份原包为 `comfy_aimdo.bak`，可随时回退；
-- **该 DLL 方案与下方的 PYTHONPATH 劫持方案互斥，二者只能启用其一**。
+> [!CAUTION]
+> **注意事项：会修改 / 替换官方 aimdo 文件**
+>
+> - 本方案会**覆盖（替换）** `site-packages/comfy_aimdo/` 下的官方文件
+>   （`control.py`、`torch.py` 等 6 个 py + `aimdo_xpu.dll`）；
+> - `deploy.bat` 会自动备份原包为 `comfy_aimdo.bak`，可随时回退；
+> - **该 DLL 方案与下方的 PYTHONPATH 劫持方案互斥，二者只能启用其一**。
 
 **使用该方案需要准备的环境**
 
@@ -81,12 +81,13 @@ comfy-aimdo（Rattus 著，v0.2.12）是 ComfyUI 的 DynamicVRAM 功能核心依
 
 **如何尝试 DLL 方案**
 
-- 从 **GitHub Releases** 下载最新发布包（`comfy_aimdo_xpu_win_v*.zip`）；
-- 解压后按包内 `README-DEPLOY-CN.md` / `README-DEPLOY-EN.md` 操作即可；
-- ⚠️ 如果你之前使用过本插件的劫持版，请先按部署文档开头的"升级提示"清理，
-  否则 DLL 不会生效。
+> [!TIP]
+> - 从 **GitHub Releases** 下载最新发布包（`comfy_aimdo_xpu_win_v*.zip`）；
+> - 解压后按包内 `README-DEPLOY-CN.md` / `README-DEPLOY-EN.md` 操作即可；
+> - ⚠️ 如果你之前使用过本插件的劫持版，请先按部署文档开头的"升级提示"清理，
+>   否则 DLL 不会生效。
 
-</div>
+---
 
 ---
 
