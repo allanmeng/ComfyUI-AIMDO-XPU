@@ -1,110 +1,137 @@
 # ComfyUI-AIMDO-XPU
 
-Intel XPU 版动态模型卸载器（comfy-aimdo XPU 替代实现）
+Intel Arc XPU 上的 DynamicVRAM 早期实现（PYTHONPATH 劫持方案）
 
-> 本质是通过调整模型的加载方式，提高显存利用率，降低OOM发生的几率
-> 简单来说：OFF（全量加载）是“空间换时间”，而 ON（DynamicVRAM / dyvram）是“时间换空间”。
-
+> [!IMPORTANT]
+> ## ⛔ 本项目已停止更新
+>
+> **不是 comfy-aimdo XPU 被废弃了，而是它被一套更好的方案接手了。**
+>
+> Intel 端已经有一个自成体系的 XPU 方案介入 aimdo，由
+> **`omni_xpu_kernel` + `ComfyUI-OmniXPU` + aimdo XPU provider + kitchen XPU provider** 四部分组成。
+> 本插件在最后一次更新（v1.0-alpha，2026-08-08）之后，整体切换到这套新方案中。
+>
+> 👉 **要在 Intel Arc 上跑 ComfyUI + DynamicVRAM，请直接看下面的「后续方案」章节，不要再安装本插件。**
 
 [**English**](README_EN.md) | 中文
 
 ---
 
-## 原版 comfy-aimdo（CUDA）核心能力
+## 为什么停更
 
-comfy-aimdo（Rattus 著，v0.2.12）是 ComfyUI 的 DynamicVRAM 功能核心依赖，提供了两项硬件级能力：
+本插件用**纯 Python 劫持**的方式，在 Intel XPU 上模拟了官方 comfy-aimdo（NVIDIA CUDA 版）的 DynamicVRAM 行为：
+不依赖任何编译、不修改 ComfyUI 源码，在 2026-04 ~ 2026-08 期间是 A / B 系列卡少数的可用方案。
 
-### 1. VBAR 虚拟地址缺页机制
-- 依赖 NVIDIA GPU 的 `aimdo.dll` 注入 CUDA 虚拟地址基址寄存器（VBAR）
-- 当模型权重超出显存时，GPU 触发缺页中断，触发按需换入（fault-in）
-- 换入后显存中只保留实际需要的部分，卸载（fault-out）后腾出空间
-- **效果**：可在有限显存中运行大于显存的模型，避免整体加载带来的 OOM
+之后 Intel 官方介入这一领域（`intel/llm-scaler` 的 `omni` 目录），给出了 **Level Zero + SYCL 的硬件级实现**：
+真实的虚拟地址预留（VBAR）+ 缺页换入，而不是软件层的 LRU 缓存模拟。
+方案质量与维护力度都远超本项目，因此本项目的「软件模拟」使命就此结束。
 
-### 2. 固定内存与文件映射
-- `cudaHostAlloc`： pinned memory 用于 GPU-CPU 高效数据传输
-- `VirtualAlloc + CreateFileMapping`：将大模型 checkpoint 文件映射到虚拟地址空间，避免一次性加载到内存
-- **效果**：降低内存占用，支持超大模型（>10GB）的流式加载
+| 对比项 | 本插件（旧） | 后续方案（现用） |
+|---|---|---|
+| 实现层次 | 纯 Python，零编译 | C/C++ + Level Zero / SYCL |
+| VBAR 机制 | LRU 张量缓存 + watermark 驱逐（软件模拟） | 真实虚拟地址预留 + 缺页换入（硬件级） |
+| 生效方式 | custom_nodes + `PYTHONPATH` 劫持 | 安装 provider 包 + 启动参数 `--enable-dynamic-vram` |
+| 性能取向 | 轻量、易分享，略有损耗 | 贴近 NVIDIA 原版 aimdo 的硬件行为 |
+| 维护状态 | ❌ 已停止（本仓库） | ✅ 活跃维护 |
 
-> 原版完全依赖 NVIDIA CUDA API，在 Intel XPU（Arc B 系列）上无法运行。
+> 也就是说：**旧插件不装、新方案照装**。两者的接口目标一致（都是让 ComfyUI 的 DynamicVRAM 在 XPU 上跑起来），
+> 但实现路径完全不同，不能混用。
 
 ---
 
-## ComfyUI-AIMDO-XPU 项目介绍
+## 后续方案：四组件结构
 
-### 🆕 【新方案尝试】DLL 后端（Level Zero 硬件级）
+新方案由四个组件拼成，各司其职：
+
+| 组件 | 作用 | 说明 |
+|---|---|---|
+| **omni_xpu_kernel** | 高性能 Intel XPU / SYCL kernel（attention、量化等） | 从 `intel/llm-scaler` 提取 |
+| **ComfyUI-OmniXPU** | ComfyUI 侧的薄适配层（custom node） | 把 kernel 接进 ComfyUI |
+| **aimdo XPU provider** | DynamicVRAM 后端 | **取代本插件的劫持方案** |
+| **kitchen XPU provider** | 推理 kernel 后端 | comfy-kitchen 的 XPU fork |
+
+### 按显卡分线选择（重要）
+
+A 系列（DG2）与 B 系列（BMG）走的是**两条不同的发行线**，不要混装：
+
+| 组件 | A770 / DG2（Xe-HPG） | B 系列 / BMG（Battlemage） |
+|---|---|---|
+| **omni_xpu_kernel**（kernel） | <https://github.com/Blackwood416/omni-xpu-kernel> | <https://github.com/intel/llm-scaler/tree/main/omni/omni_xpu_kernel> |
+| **ComfyUI-OmniXPU** | <https://github.com/Blackwood416/ComfyUI-OmniXPU> | <https://github.com/intel/llm-scaler/tree/main/omni/ComfyUI-OmniXPU> |
+| **comfy-aimdo-xpu**（aimdo XPU provider） | <https://github.com/Blackwood416/comfy-aimdo-xpu> | <https://github.com/xiangyuT/comfy-aimdo-xpu> |
+| **comfy-kitchen-xpu**（kitchen XPU provider） | <https://github.com/xiangyuT/comfy-kitchen-xpu> | <https://github.com/xiangyuT/comfy-kitchen-xpu> |
 
 > [!NOTE]
-> **这是本项目的一次新尝试**：以预编译 DLL 的形式提供硬件级 DynamicVRAM 后端，
-> 与下方原有的纯 Python 劫持方案互补。目前以 **Release 试点** 形式发布，
-> 欢迎试用并反馈。
-
-**方案来源**
-
-- 基于社区项目 `xiangyuT/comfy-aimdo-xpu`
-  （<https://github.com/xiangyuT/comfy-aimdo-xpu>）的 `dev/xpu-level-zero-vbar` 分支构建，
-  该分支提供 Intel **Level Zero** + oneAPI SYCL 的硬件级实现；
-- 本仓库在其基础上，针对 Windows 编译为 `aimdo_xpu.dll`，并通过 Release 发布试点，
-  便于 Windows 用户直接下载使用。
-
-**方案原理**
-
-- 与 Python 劫持方案的"LRU 张量缓存模拟"不同，DLL 后端使用**真实的 Level Zero 虚拟地址预留
-  （VBAR）+ 缺页换入机制**，更接近 NVIDIA 原版 comfy-aimdo 的硬件行为；
-- 它通过**替换 `site-packages` 中的 `comfy_aimdo` 包**生效，而不是 PYTHONPATH 劫持。
-
-> [!CAUTION]
-> **注意事项：会修改 / 替换官方 aimdo 文件**
+> **关于「官方」的一点说明（避免踩坑）**
 >
-> - 本方案会**覆盖（替换）** `site-packages/comfy_aimdo/` 下的官方文件
->   （`control.py`、`torch.py` 等 6 个 py + `aimdo_xpu.dll`）；
-> - `deploy.bat` 会自动备份原包为 `comfy_aimdo.bak`，可随时回退；
-> - **该 DLL 方案与下方的 PYTHONPATH 劫持方案互斥，二者只能启用其一**。
+> - `intel/llm-scaler` 是 Intel 官方仓库，其 `omni` 目录当前**面向 B 系列 / Battlemage**（native wheel AOT 编译给 BMG），
+>   且 `0.2.0-b2` 仍是 **beta、实验性、仅源码构建**。
+> - `Blackwood416/omni-xpu-kernel` 与 `Blackwood416/ComfyUI-OmniXPU` 是从 `intel/llm-scaler` **提取出来的 A770 / DG2 独立 fork**
+>   ——因为上游只覆盖 BMG，A 系列需要走这条线。
+> - `xiangyuT/comfy-aimdo-xpu` 与 `xiangyuT/comfy-kitchen-xpu` 是社区维护的 XPU fork，
+>   仓库自述为**实验性**，验证范围主要是 Ubuntu 24.04 LTS + Arc Pro B70；
+>   其它操作系统、显卡型号、软件环境的兼容性、正确性与性能**不作保证**。
+>
+> 也就是说：**这些组件的适用范围各不相同，装之前先确认自己的卡型对应的那条线。**
 
-**使用该方案需要准备的环境**
+### 预编译包使用手册
 
-| # | 环境要求 | 说明 |
-|---|---------|------|
-| 1 | Intel Arc 显卡（B580 / A770 / A750 等） | 已安装最新 Intel 显卡驱动 |
-| 2 | ComfyUI-aki 整合包（Intel ARC 版） | 内置 torch 2.13.0+xpu 等 XPU 环境 |
-| 3 | Intel oneAPI 2026.1 | 必须与本包编译版本一致 |
-| 4 | Windows 11 / 10（64 位） | |
+不想自己编译、想直接下载整合包的用户，请看：
 
-**与劫持方案对比**
+📖 **《Intel GPU 的 ComfyUI 系统优化指南》**
+<https://allanmeng.github.io/IntelGpu-ComfyUI-Collection/intel-comfyui-guide/>
 
-| 维度 | Python 劫持方案（默认） | DLL 后端方案（试点） |
-|---|---|---|
-| 实现方式 | 纯 Python，零编译 | 预编译 C/C++（Level Zero + SYCL） |
-| VBAR 机制 | LRU 缓存 + watermark 驱逐（软件模拟） | 真实虚拟地址预留 + 缺页换入（硬件级） |
-| 部署方式 | custom_nodes + PYTHONPATH 劫持 | 部署到 site-packages（替换官方包） |
-| 依赖 | 无编译依赖 | 需 oneAPI 2026.1（与编译版本一致） |
-| 性能取向 | 轻量、易分享 | 更贴近原版 aimdo 性能 |
-
-**如何尝试 DLL 方案**
-
-> [!TIP]
-> - 从 **GitHub Releases** 下载最新发布包（`comfy_aimdo_xpu_win_v*.zip`）；
-> - 解压后按包内 `README-DEPLOY-CN.md` / `README-DEPLOY-EN.md` 操作即可；
-> - ⚠️ 如果你之前使用过本插件的劫持版，请先按部署文档开头的"升级提示"清理，
->   否则 DLL 不会生效。
+手册覆盖：背景说明 → 优化思路 → 安装 → 验证与故障排查 → 实测数据与 FAQ → 内核升级后的组件检查与恢复。
 
 ---
 
+## 社区
+
+我们有 Intel GPU 的社区网页和 QQ 群，有兴趣可以关注：
+
+- 项目集主页：<https://allanmeng.github.io/IntelGpu-ComfyUI-Collection/>
+- QQ 群：**220819365**（<https://qm.qq.com/q/gls9aI3lgA>）
+
 ---
 
-### 原方案架构决策：PYTHONPATH 劫持
+## 如果你还在用本插件
 
-原方案以相同的 Python API 接口，在 Intel XPU 上重新实现上述能力，**无需修改 ComfyUI 官方代码**。
+本插件**不会再适配新的 ComfyUI 内核**。继续使用会导致插件与新内核（以及新 aimdo）的调用约定不匹配，
+最坏情况是无法正常启动工作台（v0.4 就踩过一次这个坑）。
 
-官方 comfy-aimdo 安装在 `site-packages/comfy_aimdo/`，本项目在 custom_nodes 目录下放置同名 `comfy_aimdo/` 包，通过启动脚本将项目路径加入 `PYTHONPATH` 最前面，使 `import comfy_aimdo` 优先命中本项目，实现透明替换。
+迁移步骤：
 
-> **为什么不用 custom_node __init__.py 做劫持？** `main.py` 第 34 行的 `import comfy.aimdo.control` 早于 custom_nodes 加载，custom_nodes 的 `__init__.py` 介入时已经太晚了。
+1. **先摘掉劫持**：把启动 bat 里那行 `set "PYTHONPATH=..."` 注释掉或删除；
+   如果你装过 DLL 试点版，用部署文档里的方式回退 `site-packages/comfy_aimdo` 备份。
+2. **清理插件目录**（可选）：删除 `custom_nodes/ComfyUI-AIMDO-XPU`。
+3. **按上面的分线表安装新方案**，并参考使用手册操作。
+
+> 回退插件的原理很简单：本插件只是在 `PYTHONPATH` 最前面插了一个同名 `comfy_aimdo/` 包。
+> 去掉那行 `set`，`import comfy_aimdo` 就会重新命中 `site-packages` 里的官方包。
+
+---
+
+## 历史存档：原方案是怎么做的（仅作原理参考，勿再安装）
+
+<details>
+<summary>展开查看 v1.0-alpha 的架构说明</summary>
+
+### 架构决策：PYTHONPATH 劫持
+
+原方案以相同的 Python API 接口，在 Intel XPU 上重新实现 comfy-aimdo 的能力，**无需修改 ComfyUI 官方代码**。
+
+官方 comfy-aimdo 安装在 `site-packages/comfy_aimdo/`，本项目在 `custom_nodes` 目录下放置同名 `comfy_aimdo/` 包，
+通过启动脚本把项目路径加到 `PYTHONPATH` 最前面，使 `import comfy_aimdo` 优先命中本项目，实现透明替换。
+
+> **为什么不用 custom_node 的 `__init__.py` 做劫持？** `main.py` 里的 `import comfy.aimdo.control`
+> 早于 custom_nodes 加载，等 custom_nodes 的 `__init__.py` 介入时已经太晚了。
 
 #### 替代策略
 
 | 原版 CUDA 机制 | XPU 替代实现 |
 |---|---|
-| aimdo.dll VBAR 虚拟地址缺页 | torch.xpu LRU 张量缓存（model_vbar.py） |
-| CUDA `page fault handler` | 显式 `fault()` 换入/换出 |
+| `aimdo.dll` VBAR 虚拟地址缺页 | `torch.xpu` LRU 张量缓存（`model_vbar.py`） |
+| CUDA page fault handler | 显式 `fault()` 换入 / 换出 |
 | `cudaHostAlloc` 固定内存 | `torch.empty(pin_memory=True)` |
 | `VirtualAlloc + CreateFileMapping` | Python `mmap` 模块 |
 | CUDA 设备属性查询 | `torch.xpu.get_device_properties()` |
@@ -115,100 +142,31 @@ comfy-aimdo（Rattus 著，v0.2.12）是 ComfyUI 的 DynamicVRAM 功能核心依
 ComfyUI-AIMDO-XPU/
 ├── comfy_aimdo/              ← 劫持包（目录名必须与官方包相同）
 │   ├── __init__.py           ← torch.cuda 全局 shim；加载时一次性 patch
-│   ├── control.py            ← init/init_device/get_total_vram_usage
+│   ├── control.py            ← init / init_device / get_total_vram_usage
 │   ├── model_vbar.py         ← ModelVBAR + 全部模块级函数
 │   ├── torch.py              ← aimdo_to_tensor / hostbuf_to_tensor
-│   ├── host_buffer.py       ← HostBuffer（用 torch pin_memory 代替 CUDA）
-│   └── model_mmap.py         ← ModelMMAP（用 Python mmap 代替 aimdo.dll）
-│   ├── vram_buffer.py       ← VRAMBuffer（ComfyUI 新版接口）
+│   ├── host_buffer.py        ← HostBuffer（用 torch pin_memory 代替 CUDA）
+│   ├── model_mmap.py         ← ModelMMAP（用 Python mmap 代替 aimdo.dll）
+│   └── vram_buffer.py        ← VRAMBuffer（ComfyUI 新版接口）
 ├── __init__.py               ← custom_node 入口；含 XPUAIMDOStatus 节点（开关 + debug）
-└── README.md
+├── README.md
+└── README_EN.md
 ```
 
----
+#### 激活方式（历史）
 
-#### 下载与安装
-
-##### 方式一：Git Clone（推荐）
-
-```batch
-cd f:\ComfyUI-aki-v3\ComfyUI\custom_nodes
-git clone https://github.com/allanmeng/ComfyUI-AIMDO-XPU.git
-```
-
-##### 方式二：下载 ZIP
-
-1. 访问 [GitHub 仓库](https://github.com/allanmeng/ComfyUI-AIMDO-XPU)
-2. 点击 **Code** → **Download ZIP**
-3. 解压到 `ComfyUI/custom_nodes/ComfyUI-AIMDO-XPU` 目录
-
-##### 前置要求
-
-- Intel Arc B 系列显卡（B580 / B570 等）
-- Intel oneAPI Base Toolkit（提供 oneMKL 和 SYCL 运行时）
-- PyTorch XPU 版本：`pip install torch --index-url https://download.pytorch.org/whl/xpu`
-- ComfyUI-aki-v3 或其他支持 Intel XPU 的 ComfyUI 发行版
-
-##### 验证安装
-
-启动 ComfyUI 后，查看日志中是否出现：
-
-```
-[ComfyUI-AIMDO-XPU] ✅ XPU hijack ACTIVE
-[ComfyUI-AIMDO-XPU] v0.5
-```
-
----
-
-#### 激活方式
-
-在启动 ComfyUI **之前**，将本项目根目录赋值到 `PYTHONPATH` ，放到bat启动文件中， main.py的前面：
+在启动 ComfyUI **之前**，把项目根目录加到 `PYTHONPATH`：
 
 ```batch
 :: 假设你的启动脚本位于 ComfyUI-aki-v3\ 目录下
 set "PYTHONPATH=%~dp0ComfyUI\custom_nodes\ComfyUI-AIMDO-XPU;%PYTHONPATH%"
-
-:: 下面这句是原来的启动项
-"%PYTHON_PATH%\python.exe" "%COMFYUI_PATH%\main.py" --lowvram --disable-smart-memory --reserve-vram 0.1 --preview-method none --use-pytorch-cross-attention
 ```
 
-`%~dp0` 自动指向 bat 文件所在目录，适配任意安装路径。
+Python 模块搜索顺序为 `PYTHONPATH` > `site-packages`，因此 `import comfy_aimdo` 会优先找到本目录下的包。
 
-> Python 模块搜索顺序：`PYTHONPATH` > `site-packages`，因此
-> `import comfy_aimdo` 会优先找到本目录下的 `comfy_aimdo/` 包，
-> 而不是 `site-packages` 中的官方 CUDA 版本。
+#### 验证方法（历史）
 
-##### 如何禁用劫持
-
-注释掉上述 `set PYTHONPATH` 行即可切回官方 comfy-aimdo（CUDA），用于对比测试。
-
-##### 工作台中切换 DynamicVRAM
-
-XPU AIMDO Status 节点新增 `Enable_DynamicVRAM` 开关（v0.5）：
-
-<img width="45%" height="45%" alt="image" src="https://github.com/user-attachments/assets/afde7138-bdf5-4d09-88a7-d31718e81e05" />
-
-- **ON** = VBAR 显存分级加载（节省 VRAM，推理较慢）
-- **OFF** = 全速全量加载（占用更多 VRAM，推理最快）
-- **删除节点** = 自动恢复 OFF
-- **debug** 勾选框开启 Proxy 诊断日志
-
-| 模式 | 空间（显存）占用 | 运行速度 | 相当于什么？ | 
-|--------|--------|------|--------|
-|OFF（全量加载）|❌ 极高（容易 OOM 爆显存）|🚀 极快（满血全速）|所有的参考书全部平铺在巨大的书桌上，伸手就能拿到，翻书速度最快。|
-|ON（dyvram 模式）|极低（12G 也能跑巨型大图）|🐢 变慢（取决于策略）|书桌很小，放不下几本书。每次要看下一章，都得把桌上的书收起来，再从书架上拿一本新书摆出来。|
-
-
-
-> 只要把该节点独立的放在工作流中，保持启用状态即可，不用链接任何其他节点
-> 切换Enable_DynamicVRAM开关，立即生效，无需重启 ComfyUI。切换 OFF 后会自动清理 VBAR 缓存和显存碎片。
-
-
----
-
-#### 验证方法
-
-##### 方法一：查看启动日志
+启动日志中应出现：
 
 ```
 [ComfyUI-AIMDO-XPU] ✅ XPU hijack ACTIVE  →  ...ComfyUI-AIMDO-XPU\comfy_aimdo\__init__.py
@@ -216,35 +174,58 @@ XPU AIMDO Status 节点新增 `Enable_DynamicVRAM` 开关（v0.5）：
 DynamicVRAM support detected and enabled
 ```
 
-##### 方法二：工作流节点
+#### 工作台内开关（v0.5）
 
-在工作流中添加 **"XPU AIMDO Status"** 节点，运行后日志中会显示完整状态报告。
+`XPU AIMDO Status` 节点提供 `Enable_DynamicVRAM` 开关：
 
----
+- **ON** = VBAR 分级加载（省显存，推理较慢）
+- **OFF** = 全速全量加载（占更多显存，推理最快）
+- **删除节点** = 自动恢复 OFF；`debug` 勾选框开启 Proxy 诊断日志
+
+一句话理解：**OFF 是「空间换时间」，ON（dyvram）是「时间换空间」。**
+OFF 把书全摊在大桌子上，随手就拿；ON 桌子小，每看一章都要收书、换书。
 
 #### 与原版的差异
 
-- **无硬件级缺页中断（VBAR）**：改为 Python 层 LRU 换入/换出，性能略低但功能等价
+- **无硬件级缺页中断（VBAR）**：改为 Python 层 LRU 换入 / 换出，性能略低但功能等价
 - **不依赖任何 CUDA 组件**
 - `comfy.memory_management.aimdo_enabled` 会被设为 `True`，
-  `CoreModelPatcher` 切换为 `ModelPatcherDynamic`，与原版路径完全一致
-
----
+  `CoreModelPatcher` 切换为 `ModelPatcherDynamic`，与原版路径一致
 
 #### 已知限制
 
-##### ❌ 不支持 NF4 / FP4 量化
+**❌ 不支持 NF4 / FP4 量化**：Intel XPU 上 `bitsandbytes.matmul_4bit` 底层调用 CUDA-specific kernel，
+XPU 后端无对应实现。表现是报错或回退到非量化路径。
+替代方案：使用 GGUF 的 **Q4_K / Q5_K / Q6_K** 或 **GGUF-f16 / bf16** 格式。
 
-Intel XPU（Arc B 系列）**不支持** NF4 / FP4 量化推理。原因：`bitsandbytes.matmul_4bit` 底层调用 CUDA-specific kernel，XPU 后端无对应实现。
+**❌ 抗内核变动能力弱**：因为要时刻保持与官方 aimdo、ComfyUI 内核的调用约定一致，
+任何一方升级都可能让插件报错 —— 这也是最终被 provider 形态取代的原因之一。
 
-**表现**：工作流中使用 NF4/FP4 量化模型时会报错或回退到非量化路径。
+#### 附：DLL 试点
 
-**影响范围**：
-- Stable Diffusion 模型的 NF4/FP4 量化权重（通常标记为 `-NF4`、`-FP4` 后缀）
-- 第三方量化工具导出的 4-bit 量化版本
+v1.0-alpha 期间还尝试过一次 **DLL 后端试点**：基于
+[`xiangyuT/comfy-aimdo-xpu`](https://github.com/xiangyuT/comfy-aimdo-xpu) 的 `dev/xpu-level-zero-vbar` 分支，
+编译 Windows 版 `aimdo_xpu.dll`，以「替换 `site-packages/comfy_aimdo`」的方式生效。
+该试点现已被上游正式的 provider 形态取代，不再单独维护。
 
-**替代方案**：
-- 使用 **Q4_K** / **Q5_K** / **Q6_K** 等 GGUF 量化格式（XPU 支持）
-- 使用 **GGUF-f16** / **GGUF-bf16** 全精度格式
+</details>
 
-> 日志中 `gguf qtypes` 字段可查看当前模型实际使用的量化类型。
+---
+
+## 版本历史
+
+完整记录见 [CHANGELOG.md](CHANGELOG.md)。
+
+| 版本 | 日期 | 主要变化 |
+|---|---|---|
+| v1.0-alpha | 2026-08-08 | 新增 DLL 后端试点；文档重构（**最终版本**，此后项目转入新方案） |
+| v0.5 | 2026-06-02 | `Enable_DynamicVRAM` 运行时开关、`__class__` 双向切换、四步清洗 |
+| v0.4 | 2026-06-02 | 修复 ComfyUI 0.23.0 升级导致的无法启动，新增 `init_devices()` |
+| v0.3 | 2026-05-17 | `model_mmap` 大模型零拷贝修复（ACCESS_COPY + from_buffer） |
+| v0.2 | 2026-05-04 | 新增 `VRAMBuffer`，启动时 API 兼容性检查 |
+| v0.1 | 2026-04-28 | 首次发布：XPU 上的 comfy-aimdo 重实现 |
+
+## License
+
+本仓库未附带独立的 License 文件。代码作为**历史存档**保留，不再接受功能类 PR / issue。
+有使用问题请转向上面的新方案仓库与社区渠道。
