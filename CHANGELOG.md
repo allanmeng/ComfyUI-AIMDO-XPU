@@ -1,5 +1,26 @@
 # 更新日志
 
+## 文档更新（2026-10-10）— 停更交接说明
+
+> 纯文档改动（中文 + 英文），**不含任何代码变更**。
+
+### 变更
+- README / README_EN 重写为「项目已停止更新」的交接说明，让访客能快速了解后续去向：
+  - 顶部新增停更声明，明确「不是 comfy-aimdo XPU 被废弃，而是整体切换到了新方案」；
+  - 新增新旧方案对比表（软件模拟 VBAR ↔ 硬件级 Level Zero / SYCL）；
+  - 新增后续方案的「四组件结构」说明：`omni_xpu_kernel` + `ComfyUI-OmniXPU` + aimdo XPU provider + kitchen XPU provider；
+  - 新增按显卡分线的组件链接表（A770 / DG2 与 B 系列 / BMG 两条发行线，勿混装）；
+  - 新增「官方」适用范围的澄清：`intel/llm-scaler` 的 `omni` 目录当前只覆盖 B 系列 / BMG，
+    A770 / DG2 走独立 fork，aimdo / kitchen 的 XPU provider 为社区维护的实验性 fork；
+  - 新增旧用户迁移步骤（摘掉 `PYTHONPATH` 劫持 → 清理插件目录 → 安装新方案）；
+  - 原劫持方案的架构说明（替代策略 / 项目结构 / 激活与验证 / 已知限制）移入折叠的「历史存档」区，
+    并标注「仅作原理参考，勿再安装」。
+- 新增「社区」章节：项目集主页与 QQ 群入口。
+
+### 说明
+- 本仓库自此作为**历史存档**保留，不再适配新的 ComfyUI 内核。
+- 使用问题请转向上表对应的新方案仓库与社区渠道。
+
 ## v1.0-alpha (2026-08-08)
 
 ### 新增
@@ -105,6 +126,52 @@
 ---
 
 # Changelog
+
+## Docs update (2026-10-10) — project handover notice
+
+> Documentation-only change (Chinese + English), **no code changes**.
+
+### Changed
+- README / README_EN rewritten as a "no longer maintained" handover notice, so visitors
+  immediately understand the status and where to go next:
+  - added a prominent notice at the top clarifying that comfy-aimdo for XPU was **not**
+    abandoned — the work moved to the successor stack;
+  - added an old-vs-new comparison table (simulated VBAR vs hardware-level Level Zero / SYCL);
+  - added the successor stack layout: `omni_xpu_kernel` + `ComfyUI-OmniXPU` +
+    aimdo XPU provider + kitchen XPU provider;
+  - added a per-architecture component link table (A770 / DG2 vs B-Series / BMG — two
+    separate distribution lines, do not mix);
+  - added a clarification of the scope of "official": the `omni` directory of
+    `intel/llm-scaler` currently covers B-Series / BMG only, the A770 / DG2 line is a
+    standalone fork, and the aimdo / kitchen XPU providers are community-maintained
+    experimental forks;
+  - added migration steps for existing users (remove the `PYTHONPATH` hijack → clean up the
+    plugin directory → install the successor stack);
+  - moved the original hijack architecture notes (replacement strategy / project structure /
+    activation & verification / known limitations) into a collapsed "archive" section marked
+    "reference only — do not install".
+- Added a "Community" section (project collection page and QQ group).
+
+### Notes
+- This repository is kept as a **historical archive** and will not be adapted to new ComfyUI kernels.
+- For usage questions, please use the corresponding successor repositories and community channels.
+
+## v1.0-alpha (2026-08-08)
+
+### Added
+- **【New pilot】DLL backend (Level Zero, hardware-level)** — provides a hardware-level
+  DynamicVRAM backend as a precompiled `aimdo_xpu.dll`
+  - Built from the `dev/xpu-level-zero-vbar` branch of the community project `xiangyuT/comfy-aimdo-xpu`
+  - Uses real Level Zero virtual address reservation (VBAR) + page-fault fault-in, closer to the original NVIDIA aimdo
+  - Takes effect by replacing the `comfy_aimdo` package in `site-packages` (deploy.bat backs up automatically, rollback available)
+  - Released as a **GitHub Release pilot**; see the 【New pilot】section in the README
+- Added the `release/comfy_aimdo_xpu_win_v0.4.13.zip` package (with CN/EN deployment docs)
+
+### Docs
+- Removed the milestone list from the README
+- Added the 【New pilot】DLL backend section to the README (origin / principle / requirements / comparison / how to try)
+- Renamed "Architecture decision: PYTHONPATH hijack" to "Original architecture decision: PYTHONPATH hijack"
+- Synced README_EN.md with the Chinese version
 
 ## v0.5 (2026-06-02)
 
